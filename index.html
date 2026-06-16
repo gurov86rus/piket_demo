@@ -80,6 +80,27 @@
       align-items: center;
     }
 
+    .view-controls {
+      position: absolute;
+      right: 24px;
+      top: 20px;
+      display: grid;
+      gap: 8px;
+      justify-items: end;
+    }
+
+    .control-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.78);
+      border: 1px solid rgba(174,180,186,.72);
+      border-radius: 8px;
+      padding: 6px;
+      box-shadow: 0 6px 18px rgba(34,39,44,.08);
+      backdrop-filter: blur(8px);
+    }
+
     button {
       appearance: none;
       border: 1px solid #aeb4ba;
@@ -95,6 +116,43 @@
     }
 
     button:hover { background: #f3f5f6; }
+
+    .text-button {
+      width: auto;
+      min-width: 56px;
+      padding: 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .text-button.active {
+      color: #fff;
+      background: var(--ink);
+      border-color: var(--ink);
+    }
+
+    .sheet-toggle {
+      display: none;
+      position: absolute;
+      right: 16px;
+      bottom: 14px;
+      width: auto;
+      min-width: 42px;
+      padding: 0 12px;
+      font-size: 13px;
+      z-index: 3;
+    }
+
+    .sheet-handle {
+      display: none;
+      width: 44px;
+      height: 4px;
+      border-radius: 999px;
+      background: #c4c9ce;
+      margin: 0 auto 14px;
+    }
+
 
     .side {
       background: #fff;
@@ -167,13 +225,43 @@
     }
 
     @media (max-width: 860px) {
-      body { overflow: auto; }
+      body { overflow: hidden; }
       .app { grid-template-columns: 1fr; min-height: 100vh; }
-      .viewport { height: 70vh; min-height: 520px; }
-      .side { border-left: 0; border-top: 1px solid var(--line); }
+      .viewport { height: 100vh; min-height: 0; }
+      .side {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 58vh;
+        padding: 12px 16px 18px;
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        border-radius: 14px 14px 0 0;
+        box-shadow: 0 -16px 36px rgba(24,29,34,.18);
+        transform: translateY(calc(100% - 54px));
+        transition: transform .24s ease;
+        z-index: 4;
+      }
+      body.sheet-open .side { transform: translateY(0); }
+      .sheet-handle { display: block; }
+      .sheet-toggle { display: block; }
       .title { left: 16px; top: 14px; right: 16px; }
       h1 { font-size: 20px; }
+      .subtitle { max-width: 330px; }
       .toolbar { left: 16px; bottom: 14px; }
+      .view-controls {
+        left: 16px;
+        right: 16px;
+        top: auto;
+        bottom: 62px;
+        justify-items: start;
+      }
+      .control-row {
+        max-width: calc(100vw - 32px);
+        overflow-x: auto;
+      }
+      .text-button { min-width: 52px; }
     }
   </style>
 </head>
@@ -185,14 +273,27 @@
         <h1>Пикетный столбик 60x60 на розетке 350 мм</h1>
         <p class="subtitle">Видимая часть столбика 250 мм, еще 50 мм профиля уходит внутрь розетки до нижнего листа.</p>
       </div>
+      <div class="view-controls" aria-label="Быстрые виды и режимы">
+        <div class="control-row">
+          <button class="text-button" data-view="front" title="Вид спереди">Фронт</button>
+          <button class="text-button" data-view="side" title="Вид сбоку">Сбоку</button>
+          <button class="text-button" data-view="top" title="Вид сверху">Сверху</button>
+        </div>
+        <div class="control-row">
+          <button class="text-button active" id="toggleDims" title="Показать или скрыть размеры">Размеры</button>
+          <button class="text-button" id="assemble" title="Показать сборку">Сборка</button>
+        </div>
+      </div>
       <div class="toolbar" aria-label="Управление видом">
         <button id="zoomIn" title="Приблизить">+</button>
         <button id="zoomOut" title="Отдалить">-</button>
         <button id="reset" title="Сбросить вид">⟲</button>
       </div>
+      <button class="sheet-toggle" id="sheetToggle" title="Открыть размеры">Размеры</button>
     </section>
 
     <aside class="side">
+      <div class="sheet-handle" aria-hidden="true"></div>
       <div class="section">
         <h2>Размеры</h2>
         <div class="spec">
@@ -263,7 +364,10 @@
       lastY: 0,
       pointers: new Map(),
       pinchStartDistance: 0,
-      pinchStartZoom: 1.46
+      pinchStartZoom: 1.46,
+      showDimensions: true,
+      assemblyProgress: 1,
+      animationFrame: null
     };
 
     const dims = {
@@ -358,7 +462,8 @@
         fill: fill.startsWith('#') ? shade(fill, 0.78 + Math.max(-0.18, dot) * 0.26) : fill,
         stroke,
         depth: faceDepth(points),
-        tag
+        tag,
+        stage: 0
       };
       mesh.push(poly);
       return poly;
@@ -383,12 +488,15 @@
         const p1 = circlePoint(radius, y0, a1);
         const p2 = circlePoint(radius, y1, a1);
         const p3 = circlePoint(radius, y1, a0);
-        addPoly(mesh, [p0, p1, p2, p3], fill);
+        const side = addPoly(mesh, [p0, p1, p2, p3], fill);
+        side.stage = 1;
         top.push(p3);
         bottom.push(p0);
       }
-      addPoly(mesh, top, colors.concreteLight, 'rgba(20,24,28,.25)', 'top');
-      addPoly(mesh, bottom.reverse(), colors.concreteDark, 'rgba(20,24,28,.2)');
+      const topPoly = addPoly(mesh, top, colors.concreteLight, 'rgba(20,24,28,.25)', 'top');
+      const bottomPoly = addPoly(mesh, bottom.reverse(), colors.concreteDark, 'rgba(20,24,28,.2)');
+      topPoly.stage = 1;
+      bottomPoly.stage = 1;
     }
 
     function coneWithSquareHole(mesh) {
@@ -403,7 +511,8 @@
         const p1 = circlePoint(dims.radius, y0, a1);
         const p2 = squarePoint(half, y1, a1);
         const p3 = squarePoint(half, y1, a0);
-        addPoly(mesh, [p0, p1, p2, p3], colors.concrete);
+        const cone = addPoly(mesh, [p0, p1, p2, p3], colors.concrete);
+        cone.stage = 2;
       }
       const h = half;
       const rim = [
@@ -412,19 +521,25 @@
         [{x:h,y:y1,z:h},{x:-h,y:y1,z:h},{x:-h,y:y1+2,z:h},{x:h,y:y1+2,z:h}],
         [{x:-h,y:y1,z:h},{x:-h,y:y1,z:-h},{x:-h,y:y1+2,z:-h},{x:-h,y:y1+2,z:h}]
       ];
-      rim.forEach(p => addPoly(mesh, p, '#2b2d30', 'rgba(0,0,0,.45)'));
+      rim.forEach(p => {
+        const poly = addPoly(mesh, p, '#2b2d30', 'rgba(0,0,0,.45)');
+        poly.stage = 2;
+      });
     }
 
-    function box(mesh, x0, x1, y0, y1, z0, z1, fill, tag = '') {
+    function box(mesh, x0, x1, y0, y1, z0, z1, fill, tag = '', stage = 3) {
       const p = {
         nwb: {x:x0,y:y0,z:z0}, neb: {x:x1,y:y0,z:z0}, seb: {x:x1,y:y0,z:z1}, swb: {x:x0,y:y0,z:z1},
         nwt: {x:x0,y:y1,z:z0}, net: {x:x1,y:y1,z:z0}, set: {x:x1,y:y1,z:z1}, swt: {x:x0,y:y1,z:z1}
       };
-      addPoly(mesh, [p.nwb,p.neb,p.net,p.nwt], fill, 'rgba(0,0,0,.32)', tag);
-      addPoly(mesh, [p.neb,p.seb,p.set,p.net], fill, 'rgba(0,0,0,.32)', tag);
-      addPoly(mesh, [p.seb,p.swb,p.swt,p.set], fill, 'rgba(0,0,0,.32)', tag);
-      addPoly(mesh, [p.swb,p.nwb,p.nwt,p.swt], fill, 'rgba(0,0,0,.32)', tag);
-      addPoly(mesh, [p.nwt,p.net,p.set,p.swt], fill, 'rgba(0,0,0,.28)', tag);
+      const faces = [
+        addPoly(mesh, [p.nwb,p.neb,p.net,p.nwt], fill, 'rgba(0,0,0,.32)', tag),
+        addPoly(mesh, [p.neb,p.seb,p.set,p.net], fill, 'rgba(0,0,0,.32)', tag),
+        addPoly(mesh, [p.seb,p.swb,p.swt,p.set], fill, 'rgba(0,0,0,.32)', tag),
+        addPoly(mesh, [p.swb,p.nwb,p.nwt,p.swt], fill, 'rgba(0,0,0,.32)', tag),
+        addPoly(mesh, [p.nwt,p.net,p.set,p.swt], fill, 'rgba(0,0,0,.28)', tag)
+      ];
+      faces.forEach(face => { face.stage = stage; });
     }
 
     function makeMesh() {
@@ -434,14 +549,14 @@
 
       const base = dims.disk + dims.band + dims.cone;
       const h = dims.post / 2;
-      box(mesh, -h, h, 0, base, -h, h, '#4b4d4f', 'insert');
+      box(mesh, -h, h, 0, base, -h, h, '#4b4d4f', 'insert', 3);
       const segments = [
         [0, dims.lowerBlack, colors.black],
         [dims.lowerBlack, dims.visiblePost - dims.roofHeight, colors.white]
       ];
-      segments.forEach(([a, b, color]) => box(mesh, -h, h, base + a, base + b, -h, h, color, 'post'));
+      segments.forEach(([a, b, color]) => box(mesh, -h, h, base + a, base + b, -h, h, color, 'post', 3));
       houseTop(mesh, base + dims.visiblePost - dims.roofHeight, base + dims.visiblePost, h);
-      box(mesh, -h - 2, h + 2, base - 4, base + 4, -h - 2, h + 2, '#4b4d4f', 'weld');
+      box(mesh, -h - 2, h + 2, base - 4, base + 4, -h - 2, h + 2, '#4b4d4f', 'weld', 4);
       return mesh;
     }
 
@@ -456,13 +571,16 @@
         bl: { x: -h, y: eave, z: h },
         br: { x: h, y: eave, z: h }
       };
-      addPoly(mesh, [p.fl, p.fr, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof');
-      addPoly(mesh, [p.br, p.bl, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof');
-      addPoly(mesh, [p.fr, p.br, ridgeBack, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof');
-      addPoly(mesh, [p.bl, p.fl, ridge, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof');
+      [
+        addPoly(mesh, [p.fl, p.fr, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof'),
+        addPoly(mesh, [p.br, p.bl, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof'),
+        addPoly(mesh, [p.fr, p.br, ridgeBack, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof'),
+        addPoly(mesh, [p.bl, p.fl, ridge, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof')
+      ].forEach(poly => { poly.stage = 4; });
     }
 
     function drawPoly(poly) {
+      if (!stageVisible(poly.stage)) return;
       const pts = poly.points.map(project);
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
@@ -473,6 +591,10 @@
       ctx.strokeStyle = poly.stroke;
       ctx.lineWidth = 1;
       ctx.stroke();
+    }
+
+    function stageVisible(stage) {
+      return state.assemblyProgress >= stage / 4;
     }
 
     function line3(a, b, style = colors.line, width = 1.2) {
@@ -523,6 +645,7 @@
     }
 
     function drawDimensions() {
+      if (!state.showDimensions) return;
       const top = dims.disk + dims.band + dims.cone;
       dimLine({x:-175,y:0,z:185},{x:175,y:0,z:185}, '350 мм', {x:0,y:0,z:22});
       dimLine({x:66,y:top,z:-30},{x:66,y:top+dims.visiblePost,z:-30}, '250 мм', {x:52,y:0,z:0});
@@ -558,6 +681,7 @@
     }
 
     function drawDecals() {
+      if (!stageVisible(3)) return;
       const side = visibleDigitSide();
       drawDigitDecal(side);
     }
@@ -687,8 +811,72 @@
       state.yaw = -0.62;
       state.pitch = 0.34;
       state.zoom = 1.46;
+      state.assemblyProgress = 1;
       draw();
     });
+
+    document.querySelectorAll('[data-view]').forEach(button => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        const presets = {
+          front: { yaw: 0, pitch: 0.12, zoom: 1.55 },
+          side: { yaw: Math.PI / 2, pitch: 0.16, zoom: 1.42 },
+          top: { yaw: -0.4, pitch: 0.9, zoom: 1.28 }
+        };
+        const preset = presets[view];
+        if (!preset) return;
+        document.querySelectorAll('[data-view]').forEach(item => item.classList.remove('active'));
+        button.classList.add('active');
+        state.yaw = preset.yaw;
+        state.pitch = preset.pitch;
+        state.zoom = preset.zoom;
+        draw();
+      });
+    });
+
+    document.getElementById('toggleDims').addEventListener('click', event => {
+      state.showDimensions = !state.showDimensions;
+      event.currentTarget.classList.toggle('active', state.showDimensions);
+      draw();
+    });
+
+    document.getElementById('assemble').addEventListener('click', event => {
+      runAssembly();
+      event.currentTarget.classList.add('active');
+      window.setTimeout(() => event.currentTarget.classList.remove('active'), 1250);
+    });
+
+    document.getElementById('sheetToggle').addEventListener('click', () => {
+      document.body.classList.toggle('sheet-open');
+    });
+
+    document.querySelector('.sheet-handle').addEventListener('click', () => {
+      document.body.classList.toggle('sheet-open');
+    });
+
+    function runAssembly() {
+      if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+      const start = performance.now();
+      const duration = 1400;
+      state.assemblyProgress = 0;
+      const step = now => {
+        const t = Math.min(1, (now - start) / duration);
+        state.assemblyProgress = easeOutCubic(t);
+        draw();
+        if (t < 1) {
+          state.animationFrame = requestAnimationFrame(step);
+        } else {
+          state.assemblyProgress = 1;
+          state.animationFrame = null;
+          draw();
+        }
+      };
+      state.animationFrame = requestAnimationFrame(step);
+    }
+
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
 
     window.addEventListener('resize', resize);
     resize();
