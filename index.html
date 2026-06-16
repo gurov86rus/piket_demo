@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Пикетный столбик 60x60 на розетке 350 мм</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c1f22;
+      --muted: #6d747b;
+      --line: #c9cdd1;
+      --panel: #f3f5f6;
+      --concrete: #b8b8b2;
+      --accent: #b82424;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: #e9ecef;
+      overflow: hidden;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      min-height: 100vh;
+    }
+
+    .viewport {
+      position: relative;
+      min-width: 0;
+      background:
+        linear-gradient(180deg, #f7f8f9 0%, #e2e6e9 58%, #d5d9dc 100%);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    canvas:active { cursor: grabbing; }
+
+    .title {
+      position: absolute;
+      left: 24px;
+      top: 20px;
+      max-width: 520px;
+      pointer-events: none;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      line-height: 1.16;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .toolbar {
+      position: absolute;
+      left: 24px;
+      bottom: 20px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid #aeb4ba;
+      background: #fff;
+      color: var(--ink);
+      width: 40px;
+      height: 36px;
+      border-radius: 6px;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      box-shadow: 0 1px 2px rgba(0,0,0,.08);
+    }
+
+    button:hover { background: #f3f5f6; }
+
+    .side {
+      background: #fff;
+      border-left: 1px solid var(--line);
+      padding: 20px;
+      overflow: auto;
+    }
+
+    .section { margin-bottom: 22px; }
+
+    .section h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.2;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .spec {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px 14px;
+      font-size: 14px;
+      line-height: 1.3;
+    }
+
+    .spec div:nth-child(odd) { color: var(--muted); }
+    .spec div:nth-child(even) { font-weight: 700; text-align: right; }
+
+    .swatches {
+      display: grid;
+      gap: 10px;
+      font-size: 14px;
+    }
+
+    .swatch {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .chip {
+      width: 28px;
+      height: 20px;
+      border: 1px solid #8d9399;
+      border-radius: 4px;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    .small-view {
+      height: 170px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .small-view svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    @media (max-width: 860px) {
+      body { overflow: auto; }
+      .app { grid-template-columns: 1fr; min-height: 100vh; }
+      .viewport { height: 70vh; min-height: 520px; }
+      .side { border-left: 0; border-top: 1px solid var(--line); }
+      .title { left: 16px; top: 14px; right: 16px; }
+      h1 { font-size: 20px; }
+      .toolbar { left: 16px; bottom: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="viewport">
+      <canvas id="model" aria-label="Интерактивная 3D модель пикетного столбика"></canvas>
+      <div class="title">
+        <h1>Пикетный столбик 60x60 на розетке 350 мм</h1>
+        <p class="subtitle">Видимая часть столбика 250 мм, еще 50 мм профиля уходит внутрь розетки до нижнего листа.</p>
+      </div>
+      <div class="toolbar" aria-label="Управление видом">
+        <button id="zoomIn" title="Приблизить">+</button>
+        <button id="zoomOut" title="Отдалить">-</button>
+        <button id="reset" title="Сбросить вид">⟲</button>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="section">
+        <h2>Размеры</h2>
+        <div class="spec">
+          <div>Профиль столбика</div><div>60 x 60 мм</div>
+          <div>Видимая высота</div><div>250 мм</div>
+          <div>Вставка в розетку</div><div>50 мм</div>
+          <div>Общая длина профиля</div><div>300 мм</div>
+          <div>Диаметр розетки</div><div>350 мм</div>
+          <div>Промежуточная полоса</div><div>25 мм</div>
+          <div>Конусная часть</div><div>25 мм</div>
+          <div>Толщина розетки</div><div>50 мм</div>
+          <div>Квадратный вырез</div><div>60 x 60 мм</div>
+          <div>Нижнее черное поле</div><div>105 мм</div>
+          <div>Нижний отступ цифры</div><div>25 мм</div>
+          <div>Высота цифры</div><div>75 мм</div>
+          <div>Верхний отступ цифры</div><div>25 мм</div>
+          <div>Черная крыша</div><div>20 мм</div>
+          <div>Пикетный номер</div><div>2</div>
+          <div>Ширина цифры</div><div>30 мм</div>
+          <div>Штрих цифры 1</div><div>7.5 мм</div>
+          <div>Нанесение цифры</div><div>2 стороны</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Цвета</h2>
+        <div class="swatches">
+          <div class="swatch"><span class="chip" style="background:#b8b8b2"></span><span>Розетка под цвет бетона</span></div>
+          <div class="swatch"><span class="chip" style="background:#f7f7f2"></span><span>Белые поля столбика</span></div>
+          <div class="swatch"><span class="chip" style="background:#111"></span><span>Черная разметка по альбому</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Схема сверху</h2>
+        <div class="small-view">
+          <svg viewBox="0 0 300 170" role="img" aria-label="Вид сверху">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 Z" fill="#30363b"></path>
+              </marker>
+            </defs>
+            <circle cx="150" cy="82" r="70" fill="#b8b8b2" stroke="#7f858a" stroke-width="2"></circle>
+            <circle cx="150" cy="82" r="61" fill="none" stroke="#8d9399" stroke-width="1.5"></circle>
+            <rect x="124" y="56" width="52" height="52" fill="#f7f7f2" stroke="#111" stroke-width="3"></rect>
+            <line x1="80" y1="154" x2="220" y2="154" stroke="#30363b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"></line>
+            <text x="150" y="148" text-anchor="middle" font-size="13" fill="#30363b">350 мм</text>
+            <line x1="124" y1="36" x2="176" y2="36" stroke="#30363b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"></line>
+            <text x="150" y="29" text-anchor="middle" font-size="13" fill="#30363b">60 мм</text>
+          </svg>
+        </div>
+      </div>
+
+      <p class="note">Разметка сделана по приложенным размерам и уменьшена в два раза: видимая часть 500 мм стала 250 мм, цифра 150 x 60 мм стала 75 x 30 мм. Цифра нанесена 3D-декалью на две противоположные стороны.</p>
+    </aside>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('model');
+    const ctx = canvas.getContext('2d');
+
+    const state = {
+      yaw: -0.62,
+      pitch: 0.34,
+      zoom: 1.46,
+      dragging: false,
+      lastX: 0,
+      lastY: 0
+    };
+
+    const dims = {
+      radius: 175,
+      post: 60,
+      postHeight: 300,
+      visiblePost: 250,
+      insert: 50,
+      disk: 0,
+      band: 25,
+      cone: 25,
+      lowerBlack: 105,
+      digitBottomGap: 25,
+      digitHeight: 75,
+      digitWidth: 30,
+      digitTopGap: 25,
+      roofHeight: 20
+    };
+
+    const colors = {
+      concrete: '#b8b8b2',
+      concreteDark: '#9d9e99',
+      concreteLight: '#d1d1cb',
+      black: '#101112',
+      white: '#f7f7f2',
+      line: '#2d3237',
+      red: '#b82424'
+    };
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw();
+    }
+
+    function rotatePoint(p) {
+      const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw);
+      const cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
+      const x1 = p.x * cy - p.z * sy;
+      const z1 = p.x * sy + p.z * cy;
+      const y1 = p.y * cp - z1 * sp;
+      const z2 = p.y * sp + z1 * cp;
+      return { x: x1, y: y1, z: z2 };
+    }
+
+    function project(p) {
+      const rect = canvas.getBoundingClientRect();
+      const r = rotatePoint({ x: p.x, y: p.y - 160, z: p.z });
+      const scale = state.zoom * Math.min(rect.width, rect.height) / 560;
+      return {
+        x: rect.width / 2 + r.x * scale,
+        y: rect.height / 2 - r.y * scale + 34,
+        z: r.z,
+        scale
+      };
+    }
+
+    function shade(hex, factor) {
+      const n = parseInt(hex.slice(1), 16);
+      let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+      r = Math.max(0, Math.min(255, Math.round(r * factor)));
+      g = Math.max(0, Math.min(255, Math.round(g * factor)));
+      b = Math.max(0, Math.min(255, Math.round(b * factor)));
+      return `rgb(${r},${g},${b})`;
+    }
+
+    function faceDepth(points) {
+      return points.reduce((sum, p) => sum + rotatePoint({ x: p.x, y: p.y - 160, z: p.z }).z, 0) / points.length;
+    }
+
+    function normal(points) {
+      const a = points[0], b = points[1], c = points[2];
+      const u = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+      const v = { x: c.x - a.x, y: c.y - a.y, z: c.z - a.z };
+      return {
+        x: u.y * v.z - u.z * v.y,
+        y: u.z * v.x - u.x * v.z,
+        z: u.x * v.y - u.y * v.x
+      };
+    }
+
+    function addPoly(mesh, points, fill, stroke = 'rgba(20,24,28,.34)', tag = '') {
+      const n = normal(points);
+      const light = { x: -0.4, y: 0.8, z: 0.35 };
+      const len = Math.hypot(n.x, n.y, n.z) || 1;
+      const dot = (n.x * light.x + n.y * light.y + n.z * light.z) / len;
+      const poly = {
+        points,
+        fill: fill.startsWith('#') ? shade(fill, 0.78 + Math.max(-0.18, dot) * 0.26) : fill,
+        stroke,
+        depth: faceDepth(points),
+        tag
+      };
+      mesh.push(poly);
+      return poly;
+    }
+
+    function circlePoint(r, y, a) {
+      return { x: Math.cos(a) * r, y, z: Math.sin(a) * r };
+    }
+
+    function squarePoint(half, y, a) {
+      const c = Math.cos(a), s = Math.sin(a);
+      const m = half / Math.max(Math.abs(c), Math.abs(s));
+      return { x: c * m, y, z: s * m };
+    }
+
+    function cylinder(mesh, radius, y0, y1, fill, segments = 80) {
+      const top = [], bottom = [];
+      for (let i = 0; i < segments; i++) {
+        const a0 = i / segments * Math.PI * 2;
+        const a1 = (i + 1) / segments * Math.PI * 2;
+        const p0 = circlePoint(radius, y0, a0);
+        const p1 = circlePoint(radius, y0, a1);
+        const p2 = circlePoint(radius, y1, a1);
+        const p3 = circlePoint(radius, y1, a0);
+        addPoly(mesh, [p0, p1, p2, p3], fill);
+        top.push(p3);
+        bottom.push(p0);
+      }
+      addPoly(mesh, top, colors.concreteLight, 'rgba(20,24,28,.25)', 'top');
+      addPoly(mesh, bottom.reverse(), colors.concreteDark, 'rgba(20,24,28,.2)');
+    }
+
+    function coneWithSquareHole(mesh) {
+      const segments = 96;
+      const y0 = dims.disk + dims.band;
+      const y1 = y0 + dims.cone;
+      const half = dims.post / 2 + 3;
+      for (let i = 0; i < segments; i++) {
+        const a0 = i / segments * Math.PI * 2;
+        const a1 = (i + 1) / segments * Math.PI * 2;
+        const p0 = circlePoint(dims.radius, y0, a0);
+        const p1 = circlePoint(dims.radius, y0, a1);
+        const p2 = squarePoint(half, y1, a1);
+        const p3 = squarePoint(half, y1, a0);
+        addPoly(mesh, [p0, p1, p2, p3], colors.concrete);
+      }
+      const h = half;
+      const rim = [
+        [{x:-h,y:y1,z:-h},{x:h,y:y1,z:-h},{x:h,y:y1+2,z:-h},{x:-h,y:y1+2,z:-h}],
+        [{x:h,y:y1,z:-h},{x:h,y:y1,z:h},{x:h,y:y1+2,z:h},{x:h,y:y1+2,z:-h}],
+        [{x:h,y:y1,z:h},{x:-h,y:y1,z:h},{x:-h,y:y1+2,z:h},{x:h,y:y1+2,z:h}],
+        [{x:-h,y:y1,z:h},{x:-h,y:y1,z:-h},{x:-h,y:y1+2,z:-h},{x:-h,y:y1+2,z:h}]
+      ];
+      rim.forEach(p => addPoly(mesh, p, '#2b2d30', 'rgba(0,0,0,.45)'));
+    }
+
+    function box(mesh, x0, x1, y0, y1, z0, z1, fill, tag = '') {
+      const p = {
+        nwb: {x:x0,y:y0,z:z0}, neb: {x:x1,y:y0,z:z0}, seb: {x:x1,y:y0,z:z1}, swb: {x:x0,y:y0,z:z1},
+        nwt: {x:x0,y:y1,z:z0}, net: {x:x1,y:y1,z:z0}, set: {x:x1,y:y1,z:z1}, swt: {x:x0,y:y1,z:z1}
+      };
+      addPoly(mesh, [p.nwb,p.neb,p.net,p.nwt], fill, 'rgba(0,0,0,.32)', tag);
+      addPoly(mesh, [p.neb,p.seb,p.set,p.net], fill, 'rgba(0,0,0,.32)', tag);
+      addPoly(mesh, [p.seb,p.swb,p.swt,p.set], fill, 'rgba(0,0,0,.32)', tag);
+      addPoly(mesh, [p.swb,p.nwb,p.nwt,p.swt], fill, 'rgba(0,0,0,.32)', tag);
+      addPoly(mesh, [p.nwt,p.net,p.set,p.swt], fill, 'rgba(0,0,0,.28)', tag);
+    }
+
+    function makeMesh() {
+      const mesh = [];
+      cylinder(mesh, dims.radius, 0, dims.band, colors.concrete, 96);
+      coneWithSquareHole(mesh);
+
+      const base = dims.disk + dims.band + dims.cone;
+      const h = dims.post / 2;
+      box(mesh, -h, h, 0, base, -h, h, '#4b4d4f', 'insert');
+      const segments = [
+        [0, dims.lowerBlack, colors.black],
+        [dims.lowerBlack, dims.visiblePost - dims.roofHeight, colors.white]
+      ];
+      segments.forEach(([a, b, color]) => box(mesh, -h, h, base + a, base + b, -h, h, color, 'post'));
+      houseTop(mesh, base + dims.visiblePost - dims.roofHeight, base + dims.visiblePost, h);
+      box(mesh, -h - 2, h + 2, base - 4, base + 4, -h - 2, h + 2, '#4b4d4f', 'weld');
+      return mesh;
+    }
+
+    function houseTop(mesh, y0, y1, h) {
+      const eave = y0;
+      const ridgeY = y1;
+      const ridge = { x: 0, y: ridgeY, z: -h };
+      const ridgeBack = { x: 0, y: ridgeY, z: h };
+      const p = {
+        fl: { x: -h, y: eave, z: -h },
+        fr: { x: h, y: eave, z: -h },
+        bl: { x: -h, y: eave, z: h },
+        br: { x: h, y: eave, z: h }
+      };
+      addPoly(mesh, [p.fl, p.fr, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof');
+      addPoly(mesh, [p.br, p.bl, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof');
+      addPoly(mesh, [p.fr, p.br, ridgeBack, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof');
+      addPoly(mesh, [p.bl, p.fl, ridge, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof');
+    }
+
+    function drawPoly(poly) {
+      const pts = poly.points.map(project);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.fillStyle = poly.fill;
+      ctx.fill();
+      ctx.strokeStyle = poly.stroke;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    function line3(a, b, style = colors.line, width = 1.2) {
+      const p = project(a), q = project(b);
+      ctx.strokeStyle = style;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+      ctx.stroke();
+      return [p, q];
+    }
+
+    function label3(text, p, dx = 0, dy = 0, color = colors.line) {
+      const q = project(p);
+      ctx.save();
+      ctx.font = '700 13px Arial, Helvetica, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const metrics = ctx.measureText(text);
+      const x = q.x + dx, y = q.y + dy;
+      ctx.fillStyle = 'rgba(255,255,255,.78)';
+      ctx.fillRect(x - metrics.width / 2 - 5, y - 9, metrics.width + 10, 18);
+      ctx.fillStyle = color;
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function drawArrow(from, to) {
+      const angle = Math.atan2(to.y - from.y, to.x - from.x);
+      ctx.beginPath();
+      ctx.moveTo(to.x, to.y);
+      ctx.lineTo(to.x - 8 * Math.cos(angle - .45), to.y - 8 * Math.sin(angle - .45));
+      ctx.moveTo(to.x, to.y);
+      ctx.lineTo(to.x - 8 * Math.cos(angle + .45), to.y - 8 * Math.sin(angle + .45));
+      ctx.stroke();
+    }
+
+    function dimLine(a, b, text, offset = {x:0,y:0,z:0}) {
+      const aa = {x:a.x+offset.x,y:a.y+offset.y,z:a.z+offset.z};
+      const bb = {x:b.x+offset.x,y:b.y+offset.y,z:b.z+offset.z};
+      const [p, q] = line3(aa, bb, colors.line, 1.4);
+      drawArrow(q, p);
+      drawArrow(p, q);
+      label3(text, {x:(aa.x+bb.x)/2,y:(aa.y+bb.y)/2,z:(aa.z+bb.z)/2}, 0, -14);
+      line3(a, aa, 'rgba(45,50,55,.45)', 1);
+      line3(b, bb, 'rgba(45,50,55,.45)', 1);
+    }
+
+    function drawDimensions() {
+      const top = dims.disk + dims.band + dims.cone;
+      dimLine({x:-175,y:0,z:185},{x:175,y:0,z:185}, '350 мм', {x:0,y:0,z:22});
+      dimLine({x:66,y:top,z:-30},{x:66,y:top+dims.visiblePost,z:-30}, '250 мм', {x:52,y:0,z:0});
+      dimLine({x:-78,y:0,z:-30},{x:-78,y:top,z:-30}, '50 мм в розетке', {x:-52,y:0,z:0});
+      dimLine({x:112,y:0,z:-30},{x:112,y:top+dims.visiblePost,z:-30}, '300 мм профиль', {x:92,y:0,z:0});
+      dimLine({x:-30,y:top+dims.visiblePost+18,z:-30},{x:30,y:top+dims.visiblePost+18,z:-30}, '60 мм', {x:0,y:0,z:-28});
+      dimLine({x:-66,y:top,z:42},{x:-66,y:top+dims.lowerBlack,z:42}, '105 мм', {x:-46,y:0,z:0});
+      dimLine({x:-40,y:top+dims.lowerBlack,z:50},{x:-40,y:top+dims.lowerBlack+dims.digitBottomGap,z:50}, '25 мм', {x:-26,y:0,z:0});
+      dimLine({x:-18,y:top+dims.lowerBlack+dims.digitBottomGap,z:50},{x:-18,y:top+dims.lowerBlack+dims.digitBottomGap+dims.digitHeight,z:50}, '75 мм цифра', {x:-24,y:0,z:0});
+      dimLine({x:30,y:top+dims.visiblePost-dims.roofHeight-dims.digitTopGap,z:50},{x:30,y:top+dims.visiblePost-dims.roofHeight,z:50}, '25 мм', {x:24,y:0,z:0});
+      dimLine({x:54,y:top+dims.visiblePost-dims.roofHeight,z:50},{x:54,y:top+dims.visiblePost,z:50}, '20 мм', {x:26,y:0,z:0});
+      dimLine({x:-190,y:0,z:-168},{x:-190,y:dims.band,z:-168}, '25 мм', {x:-18,y:0,z:0});
+      dimLine({x:190,y:dims.band,z:-168},{x:190,y:top,z:-168}, '25 мм', {x:18,y:0,z:0});
+    }
+
+    function drawGround() {
+      const rect = canvas.getBoundingClientRect();
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,.42)';
+      ctx.beginPath();
+      const a = project({x:-310,y:0,z:-250});
+      const b = project({x:310,y:0,z:-250});
+      const c = project({x:360,y:0,z:260});
+      const d = project({x:-360,y:0,z:260});
+      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(120,128,135,.22)';
+      for (let i = -300; i <= 300; i += 50) {
+        line3({x:i,y:0,z:-260},{x:i,y:0,z:260}, 'rgba(120,128,135,.18)', .8);
+        line3({x:-330,y:0,z:i},{x:330,y:0,z:i}, 'rgba(120,128,135,.18)', .8);
+      }
+      ctx.restore();
+    }
+
+    function drawDecals() {
+      const side = visibleDigitSide();
+      drawDigitDecal(side);
+    }
+
+    function visibleDigitSide() {
+      const frontDepth = rotatePoint({ x: 0, y: 0, z: -dims.post / 2 }).z;
+      const backDepth = rotatePoint({ x: 0, y: 0, z: dims.post / 2 }).z;
+      return frontDepth > backDepth ? 'front' : 'back';
+    }
+
+    function drawDigitDecal(side) {
+      const base = dims.disk + dims.band + dims.cone;
+      const h = dims.post / 2;
+      const yBottom = base + dims.lowerBlack + dims.digitBottomGap;
+      const yTop = yBottom + dims.digitHeight;
+      const z = side === 'front' ? -h - 1.4 : h + 1.4;
+      const xUnit = side === 'front' ? -1 : 1;
+
+      const origin = project({ x: 0, y: yTop, z });
+      const xAxis = project({ x: xUnit, y: yTop, z });
+      const yAxis = project({ x: 0, y: yTop - 1, z });
+      const ux = { x: xAxis.x - origin.x, y: xAxis.y - origin.y };
+      const uy = { x: yAxis.x - origin.x, y: yAxis.y - origin.y };
+      const rect = canvas.getBoundingClientRect();
+      const dpr = canvas.width / rect.width;
+
+      ctx.save();
+      ctx.setTransform(ux.x * dpr, ux.y * dpr, uy.x * dpr, uy.y * dpr, origin.x * dpr, origin.y * dpr);
+      ctx.fillStyle = colors.black;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.font = `900 ${dims.digitHeight}px Arial Narrow, Arial, Helvetica, sans-serif`;
+      ctx.fillText('2', 0, 0, dims.digitWidth);
+      ctx.restore();
+    }
+
+    function draw() {
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      drawGround();
+      const mesh = makeMesh().sort((a, b) => a.depth - b.depth);
+      mesh.forEach(drawPoly);
+      drawDecals();
+      drawDimensions();
+    }
+
+    function pointerPos(e) {
+      const p = e.touches ? e.touches[0] : e;
+      return { x: p.clientX, y: p.clientY };
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+      state.dragging = true;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+      canvas.setPointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener('pointermove', e => {
+      if (!state.dragging) return;
+      const dx = e.clientX - state.lastX;
+      const dy = e.clientY - state.lastY;
+      state.lastX = e.clientX;
+      state.lastY = e.clientY;
+      state.yaw += dx * 0.008;
+      state.pitch = Math.max(-0.75, Math.min(0.9, state.pitch + dy * 0.006));
+      draw();
+    });
+
+    canvas.addEventListener('pointerup', e => {
+      state.dragging = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    });
+
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      state.zoom = Math.max(0.7, Math.min(2.6, state.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+      draw();
+    }, { passive: false });
+
+    document.getElementById('zoomIn').addEventListener('click', () => {
+      state.zoom = Math.min(2.6, state.zoom * 1.12);
+      draw();
+    });
+
+    document.getElementById('zoomOut').addEventListener('click', () => {
+      state.zoom = Math.max(0.7, state.zoom / 1.12);
+      draw();
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      state.yaw = -0.62;
+      state.pitch = 0.34;
+      state.zoom = 1.46;
+      draw();
+    });
+
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>
