@@ -260,7 +260,10 @@
       zoom: 1.46,
       dragging: false,
       lastX: 0,
-      lastY: 0
+      lastY: 0,
+      pointers: new Map(),
+      pinchStartDistance: 0,
+      pinchStartZoom: 1.46
     };
 
     const dims = {
@@ -601,22 +604,37 @@
       drawDimensions();
     }
 
-    function pointerPos(e) {
-      const p = e.touches ? e.touches[0] : e;
-      return { x: p.clientX, y: p.clientY };
-    }
-
     canvas.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       state.dragging = true;
       state.lastX = e.clientX;
       state.lastY = e.clientY;
       canvas.setPointerCapture(e.pointerId);
+      if (state.pointers.size === 2) {
+        state.pinchStartDistance = activePointerDistance();
+        state.pinchStartZoom = state.zoom;
+      }
     });
 
     canvas.addEventListener('pointermove', e => {
-      if (!state.dragging) return;
-      const dx = e.clientX - state.lastX;
-      const dy = e.clientY - state.lastY;
+      if (!state.pointers.has(e.pointerId)) return;
+      e.preventDefault();
+      const previous = state.pointers.get(e.pointerId);
+      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (state.pointers.size >= 2) {
+        const distance = activePointerDistance();
+        if (state.pinchStartDistance > 0) {
+          state.zoom = clampZoom(state.pinchStartZoom * distance / state.pinchStartDistance);
+          draw();
+        }
+        return;
+      }
+
+      if (!state.dragging || !previous) return;
+      const dx = e.clientX - previous.x;
+      const dy = e.clientY - previous.y;
       state.lastX = e.clientX;
       state.lastY = e.clientY;
       state.yaw += dx * 0.008;
@@ -624,16 +642,36 @@
       draw();
     });
 
-    canvas.addEventListener('pointerup', e => {
-      state.dragging = false;
+    function finishPointer(e) {
+      state.pointers.delete(e.pointerId);
+      state.dragging = state.pointers.size > 0;
+      if (state.pointers.size === 1) {
+        const point = [...state.pointers.values()][0];
+        state.lastX = point.x;
+        state.lastY = point.y;
+      }
+      state.pinchStartDistance = 0;
       try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-    });
+    }
+
+    canvas.addEventListener('pointerup', finishPointer);
+    canvas.addEventListener('pointercancel', finishPointer);
 
     canvas.addEventListener('wheel', e => {
       e.preventDefault();
-      state.zoom = Math.max(0.7, Math.min(2.6, state.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+      state.zoom = clampZoom(state.zoom * (e.deltaY > 0 ? 0.92 : 1.08));
       draw();
     }, { passive: false });
+
+    function activePointerDistance() {
+      const points = [...state.pointers.values()];
+      if (points.length < 2) return 0;
+      return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
+    }
+
+    function clampZoom(value) {
+      return Math.max(0.7, Math.min(2.6, value));
+    }
 
     document.getElementById('zoomIn').addEventListener('click', () => {
       state.zoom = Math.min(2.6, state.zoom * 1.12);
