@@ -269,20 +269,57 @@
       .sheet-toggle { display: block; }
       .title { left: 16px; top: 14px; right: 16px; }
       h1 { font-size: 20px; }
-      .subtitle { max-width: 330px; }
+      .subtitle { max-width: 330px; font-size: 13px; }
       .toolbar { left: 16px; bottom: 14px; }
       .view-controls {
         left: 16px;
         right: 16px;
-        top: auto;
-        bottom: 62px;
-        justify-items: start;
+        top: 92px;
+        bottom: auto;
+        justify-items: stretch;
+        gap: 6px;
       }
       .control-row {
-        max-width: calc(100vw - 32px);
-        overflow-x: auto;
+        width: 100%;
+        max-width: none;
+        overflow: visible;
+        justify-content: flex-start;
+        padding: 5px;
+        gap: 6px;
       }
-      .text-button { min-width: 52px; }
+      button {
+        height: 42px;
+        min-width: 44px;
+        font-size: 18px;
+      }
+      .text-button {
+        min-width: 0;
+        height: 42px;
+        padding: 0 10px;
+        font-size: 14px;
+      }
+      .select {
+        height: 44px;
+        min-width: 0;
+        width: 100%;
+        font-size: 16px;
+      }
+      .route-controls {
+        flex-wrap: wrap;
+      }
+      .route-controls .select {
+        flex: 1 0 100%;
+      }
+      .route-controls .text-button {
+        flex: 1 1 calc(33.333% - 6px);
+      }
+    }
+
+    @media (max-width: 420px) {
+      h1 { font-size: 18px; }
+      .subtitle { display: none; }
+      .view-controls { top: 66px; }
+      .text-button { font-size: 13px; padding: 0 8px; }
     }
   </style>
 </head>
@@ -304,7 +341,7 @@
           <button class="text-button active" id="toggleDims" title="Показать или скрыть размеры">Размеры</button>
           <button class="text-button" id="assemble" title="Показать сборку">Сборка</button>
         </div>
-        <div class="control-row">
+        <div class="control-row route-controls">
           <select class="select" id="citySelect" title="Выбрать город"></select>
           <button class="text-button active" data-label-mode="kmBase" title="Километры на столбике, город на розетке">Км+розетка</button>
           <button class="text-button" data-label-mode="cityPost" title="Город на столбике, километры ниже">Город</button>
