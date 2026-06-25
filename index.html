@@ -132,6 +132,27 @@
       border-color: var(--ink);
     }
 
+    .select {
+      appearance: none;
+      border: 1px solid #aeb4ba;
+      background: #fff;
+      color: var(--ink);
+      height: 36px;
+      border-radius: 6px;
+      padding: 0 32px 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 152px;
+      background-image:
+        linear-gradient(45deg, transparent 50%, #4d545b 50%),
+        linear-gradient(135deg, #4d545b 50%, transparent 50%);
+      background-position:
+        calc(100% - 15px) 15px,
+        calc(100% - 10px) 15px;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+    }
+
     .sheet-toggle {
       display: none;
       position: absolute;
@@ -283,6 +304,12 @@
           <button class="text-button active" id="toggleDims" title="Показать или скрыть размеры">Размеры</button>
           <button class="text-button" id="assemble" title="Показать сборку">Сборка</button>
         </div>
+        <div class="control-row">
+          <select class="select" id="citySelect" title="Выбрать город"></select>
+          <button class="text-button active" data-label-mode="kmBase" title="Километры на столбике, город на розетке">Км+розетка</button>
+          <button class="text-button" data-label-mode="cityPost" title="Город на столбике, километры ниже">Город</button>
+          <button class="text-button" data-label-mode="classic" title="Исходный пикетный номер">Пикет</button>
+        </div>
       </div>
       <div class="toolbar" aria-label="Управление видом">
         <button id="zoomIn" title="Приблизить">+</button>
@@ -315,6 +342,17 @@
           <div>Ширина цифры</div><div>30 мм</div>
           <div>Штрих цифры 1</div><div>7.5 мм</div>
           <div>Нанесение цифры</div><div>2 стороны</div>
+          <div>Нанесение города</div><div>на розетку / столбик</div>
+          <div>Нанесение километров</div><div>на столбик</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Города</h2>
+        <div class="spec" id="citySpec">
+          <div>Город</div><div>Новосибирск</div>
+          <div>Расстояние</div><div>3336 км</div>
+          <div>Стиль надписи</div><div>старорусский</div>
         </div>
       </div>
 
@@ -324,6 +362,8 @@
           <div class="swatch"><span class="chip" style="background:#b8b8b2"></span><span>Розетка под цвет бетона</span></div>
           <div class="swatch"><span class="chip" style="background:#f7f7f2"></span><span>Белые поля столбика</span></div>
           <div class="swatch"><span class="chip" style="background:#111"></span><span>Черная разметка по альбому</span></div>
+          <div class="swatch"><span class="chip" style="background:#b82424"></span><span>Бордовая декоративная окантовка</span></div>
+          <div class="swatch"><span class="chip" style="background:#c9a24a"></span><span>Золотистая надпись на розетке</span></div>
         </div>
       </div>
 
@@ -347,7 +387,7 @@
         </div>
       </div>
 
-      <p class="note">Разметка сделана по приложенным размерам и уменьшена в два раза: видимая часть 500 мм стала 250 мм, цифра 150 x 60 мм стала 75 x 30 мм. Цифра нанесена 3D-декалью на две противоположные стороны.</p>
+      <p class="note">Разметка сделана по приложенным размерам и уменьшена в два раза. В режиме «Пикет» сохраняется исходная цифра 2, в цветных режимах километры наносятся на столбик, а город — на розетку или на столбик.</p>
     </aside>
   </main>
 
@@ -367,10 +407,31 @@
       pinchStartZoom: 1.46,
       showDimensions: true,
       assemblyProgress: 1,
-      animationFrame: null
+      animationFrame: null,
+      cityIndex: 0,
+      labelMode: 'kmBase'
     };
 
     const assemblySteps = 8;
+
+    const cities = [
+      { name: 'Новосибирск', km: 3336 },
+      { name: 'Чита', km: 6194 },
+      { name: 'Ярославль', km: 282 },
+      { name: 'Красноярск', km: 4097 },
+      { name: 'Иркутск', km: 5180 },
+      { name: 'Москва', km: 0 },
+      { name: 'Питер', km: 0 },
+      { name: 'Н.Новгород', km: 440 },
+      { name: 'Самара', km: 1099 },
+      { name: 'Воронеж', km: 578 },
+      { name: 'Хабаровск', km: 8522 },
+      { name: 'Ростов', km: 1223 },
+      { name: 'Екатеринбург', km: 1814 },
+      { name: 'Челябинск', km: 2109 },
+      { name: 'Калининград', km: 1285 },
+      { name: 'Саратов', km: 855 }
+    ];
 
     const dims = {
       radius: 175,
@@ -396,7 +457,10 @@
       black: '#101112',
       white: '#f7f7f2',
       line: '#2d3237',
-      red: '#b82424'
+      red: '#b82424',
+      gold: '#c9a24a',
+      darkGold: '#6f5422',
+      burgundy: '#7d1f1f'
     };
 
     function resize() {
@@ -714,7 +778,10 @@
     function drawDecals() {
       if (!stageVisible(8)) return;
       const side = visibleDigitSide();
-      drawDigitDecal(side);
+      if (state.labelMode !== 'classic') drawPostTrim(side);
+      if (state.labelMode === 'classic') drawDigitDecal(side);
+      drawRouteDecal(side);
+      drawRosetteDecal(side);
     }
 
     function drawAssemblyEffects() {
@@ -778,6 +845,121 @@
       ctx.font = `900 ${dims.digitHeight}px Arial Narrow, Arial, Helvetica, sans-serif`;
       ctx.fillText('2', 0, 0, dims.digitWidth);
       ctx.restore();
+    }
+
+    function oldRussianFont(size, weight = 700) {
+      return `${weight} ${size}px Georgia, "Times New Roman", Times, serif`;
+    }
+
+    function activeCity() {
+      return cities[state.cityIndex] || cities[0];
+    }
+
+    function decorativeName(name) {
+      return name.toLocaleUpperCase('ru-RU').replace('Н.НОВГОРОД', 'Н. НОВГОРОД');
+    }
+
+    function faceTransform(side, yTop, z, xUnit = null) {
+      const direction = xUnit === null ? (side === 'front' ? -1 : 1) : xUnit;
+      const origin = project({ x: 0, y: yTop, z });
+      const xAxis = project({ x: direction, y: yTop, z });
+      const yAxis = project({ x: 0, y: yTop - 1, z });
+      const ux = { x: xAxis.x - origin.x, y: xAxis.y - origin.y };
+      const uy = { x: yAxis.x - origin.x, y: yAxis.y - origin.y };
+      const rect = canvas.getBoundingClientRect();
+      const dpr = canvas.width / rect.width;
+      ctx.setTransform(ux.x * dpr, ux.y * dpr, uy.x * dpr, uy.y * dpr, origin.x * dpr, origin.y * dpr);
+    }
+
+    function drawPostTrim(side) {
+      const base = dims.disk + dims.band + dims.cone;
+      const h = dims.post / 2;
+      const z = side === 'front' ? -h - 1.2 : h + 1.2;
+      const xLeft = side === 'front' ? h - 5 : -h + 5;
+      const xRight = side === 'front' ? -h + 5 : h - 5;
+      const y0 = base + dims.lowerBlack + 8;
+      const y1 = base + dims.visiblePost - dims.roofHeight - 8;
+      line3({ x: xLeft, y: y0, z }, { x: xLeft, y: y1, z }, colors.burgundy, 2.2);
+      line3({ x: xRight, y: y0, z }, { x: xRight, y: y1, z }, colors.burgundy, 2.2);
+      line3({ x: xLeft, y: y1, z }, { x: xRight, y: y1, z }, colors.gold, 1.6);
+      line3({ x: xLeft, y: y0, z }, { x: xRight, y: y0, z }, colors.gold, 1.6);
+    }
+
+    function drawRouteDecal(side) {
+      if (state.labelMode === 'classic') return;
+      const city = activeCity();
+      const base = dims.disk + dims.band + dims.cone;
+      const h = dims.post / 2;
+      const z = side === 'front' ? -h - 1.6 : h + 1.6;
+      const yTop = base + dims.visiblePost - dims.roofHeight - 18;
+
+      ctx.save();
+      faceTransform(side, yTop, z);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = colors.black;
+      ctx.strokeStyle = colors.gold;
+      ctx.lineWidth = 1.1;
+
+      if (state.labelMode === 'cityPost') {
+        const name = decorativeName(city.name);
+        const nameSize = name.length > 10 ? 12 : 14;
+        ctx.font = oldRussianFont(nameSize, 700);
+        ctx.fillText(name, 0, 18, 52);
+        ctx.font = oldRussianFont(16, 700);
+        ctx.fillText(`${city.km} км`, 0, 42, 50);
+      } else {
+        ctx.font = oldRussianFont(30, 800);
+        ctx.fillText(String(city.km), 0, 24, 52);
+        ctx.font = oldRussianFont(15, 700);
+        ctx.fillText('км', 0, 52, 42);
+      }
+      ctx.restore();
+    }
+
+    function drawRosetteDecal(side) {
+      if (state.labelMode === 'classic') return;
+      const city = activeCity();
+      const z = side === 'front' ? -dims.radius - 2 : dims.radius + 2;
+      const yTop = dims.band + 17;
+      const name = decorativeName(city.name);
+
+      ctx.save();
+      faceTransform(side, yTop, z);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+
+      const plaqueWidth = Math.min(270, Math.max(130, name.length * 13 + 44));
+      ctx.fillStyle = 'rgba(72,59,42,.74)';
+      ctx.strokeStyle = colors.gold;
+      ctx.lineWidth = 2.2;
+      roundRect(-plaqueWidth / 2, -10, plaqueWidth, 22, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.font = oldRussianFont(name.length > 11 ? 17 : 20, 800);
+      ctx.strokeStyle = 'rgba(40,28,14,.7)';
+      ctx.lineWidth = 2.8;
+      ctx.strokeText(name, 0, 1, plaqueWidth - 18);
+      ctx.fillStyle = '#f2d47c';
+      ctx.fillText(name, 0, 1, plaqueWidth - 18);
+      ctx.restore();
+    }
+
+    function roundRect(x, y, width, height, radius) {
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
     }
 
     function draw() {
@@ -957,7 +1139,53 @@
       return a + (b - a) * t;
     }
 
+    function initCityControls() {
+      const select = document.getElementById('citySelect');
+      cities.forEach((city, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = `${city.name} ${city.km} км`;
+        select.appendChild(option);
+      });
+      select.value = String(state.cityIndex);
+      select.addEventListener('change', event => {
+        state.cityIndex = Number(event.currentTarget.value) || 0;
+        updateCitySpec();
+        draw();
+      });
+
+      document.querySelectorAll('[data-label-mode]').forEach(button => {
+        button.addEventListener('click', () => {
+          state.labelMode = button.dataset.labelMode;
+          document.querySelectorAll('[data-label-mode]').forEach(item => {
+            item.classList.toggle('active', item === button);
+          });
+          updateCitySpec();
+          draw();
+        });
+      });
+
+      updateCitySpec();
+    }
+
+    function updateCitySpec() {
+      const city = activeCity();
+      const spec = document.getElementById('citySpec');
+      const modeText = {
+        kmBase: 'км на столбике, город на розетке',
+        cityPost: 'город и км на столбике',
+        classic: 'исходный пикетный номер'
+      }[state.labelMode] || 'км на столбике';
+      spec.innerHTML = `
+          <div>Город</div><div>${city.name}</div>
+          <div>Расстояние</div><div>${city.km} км</div>
+          <div>Нанесение</div><div>${modeText}</div>
+          <div>Стиль надписи</div><div>старорусский</div>
+        `;
+    }
+
     window.addEventListener('resize', resize);
+    initCityControls();
     resize();
   </script>
 </body>
