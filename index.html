@@ -1,1229 +1,384 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Пикетный столбик 60x60 на розетке 350 мм</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --ink: #1c1f22;
-      --muted: #6d747b;
-      --line: #c9cdd1;
-      --panel: #f3f5f6;
-      --concrete: #b8b8b2;
-      --accent: #b82424;
-    }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#dfe4e8">
+<title>Пикетный столбик — по альбому</title>
+<style>
+  @font-face { font-family:'Russo One'; src:url('fonts/RussoOne-Regular.ttf'); font-display:block; }
+  @font-face { font-family:'Oswald'; src:url('fonts/Oswald.ttf'); font-weight:300 700; font-display:block; }
+  @font-face { font-family:'Ruslan Display'; src:url('fonts/RuslanDisplay-Regular.ttf'); font-display:block; }
 
-    * { box-sizing: border-box; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; overflow:hidden; font-family:-apple-system,Arial,Helvetica,sans-serif;
+              background:linear-gradient(180deg,#f4f6f7 0%,#dfe4e8 55%,#ccd2d7 100%);
+              -webkit-user-select:none; user-select:none; overscroll-behavior:none; }
+  #c { position:fixed; inset:0; width:100%; height:100%; display:block; touch-action:none; }
 
-    body {
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      color: var(--ink);
-      background: #e9ecef;
-      overflow: hidden;
-    }
+  /* верхняя плашка */
+  .top { position:fixed; left:0; right:0; top:0; padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;
+         display:flex; align-items:center; gap:10px; pointer-events:none; z-index:3; }
+  .top h1 { margin:0; font-size:15px; font-weight:800; color:#1b2024; letter-spacing:.01em; }
+  .top .sub { font-size:12px; color:#5d646b; margin-top:1px; }
 
-    .app {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 330px;
-      min-height: 100vh;
-    }
+  /* нижняя панель управления */
+  .bar { position:fixed; left:0; right:0; bottom:0; z-index:4;
+         padding:6px 12px calc(env(safe-area-inset-bottom) + 12px);
+         background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.92) 30%);
+         backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+         border-top:1px solid rgba(170,178,185,.5); border-radius:18px 18px 0 0;
+         box-shadow:0 -12px 30px rgba(30,36,42,.16);
+         transform:translateY(120%); transition:transform .28s cubic-bezier(.4,0,.2,1); }
+  body.panel-open .bar { transform:translateY(0); }
+  .handle { width:44px; height:5px; border-radius:99px; background:#c4c9ce; margin:4px auto 8px; }
+  .settings-btn { position:fixed; left:50%; transform:translateX(-50%); z-index:5;
+         bottom:calc(env(safe-area-inset-bottom) + 16px); height:48px; padding:0 24px;
+         border-radius:24px; border:1px solid rgba(170,178,185,.6); background:rgba(255,255,255,.9);
+         backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+         font-size:15px; font-weight:700; color:#1b2024; box-shadow:0 6px 18px rgba(30,36,42,.18); }
+  body.panel-open .settings-btn { display:none; }
+  .bar .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; max-width:560px; margin:0 auto; }
+  .field { display:flex; flex-direction:column; gap:3px; }
+  .field.city { grid-column:1 / -1; }
+  .field label { font-size:11px; font-weight:700; color:#7c828a; text-transform:uppercase; letter-spacing:.05em; padding-left:2px; }
+  select { appearance:none; width:100%; height:48px; border:1px solid #b9bfc5; background:#fff; color:#11151a;
+           border-radius:12px; padding:0 36px 0 13px; font-size:16px; font-weight:600;
+           background-image:linear-gradient(45deg,transparent 50%,#697079 50%),linear-gradient(135deg,#697079 50%,transparent 50%);
+           background-position:calc(100% - 18px) 21px,calc(100% - 13px) 21px; background-size:6px 6px,6px 6px; background-repeat:no-repeat; }
+  select:active { background-color:#f3f5f6; }
 
-    .viewport {
-      position: relative;
-      min-width: 0;
-      background:
-        linear-gradient(180deg, #f7f8f9 0%, #e2e6e9 58%, #d5d9dc 100%);
-    }
+  .reset { position:fixed; right:14px; z-index:4; bottom:calc(env(safe-area-inset-bottom) + 150px);
+           width:46px; height:46px; border-radius:50%; border:1px solid rgba(170,178,185,.6);
+           background:rgba(255,255,255,.85); backdrop-filter:blur(8px); font-size:20px; color:#3a4047;
+           display:flex; align-items:center; justify-content:center; pointer-events:auto; }
 
-    canvas {
-      display: block;
-      width: 100%;
-      height: 100%;
-      cursor: grab;
-      touch-action: none;
-    }
+  .loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; gap:10px;
+             font-size:14px; color:#5d646b; background:linear-gradient(180deg,#f4f6f7,#d9dee2); z-index:9; }
+  .spin { width:18px; height:18px; border:2px solid #c2c8ce; border-top-color:#6a7178; border-radius:50%; animation:s .8s linear infinite; }
+  @keyframes s { to { transform:rotate(360deg); } }
 
-    canvas:active { cursor: grabbing; }
-
-    .title {
-      position: absolute;
-      left: 24px;
-      top: 20px;
-      max-width: 520px;
-      pointer-events: none;
-    }
-
-    h1 {
-      margin: 0 0 6px;
-      font-size: 24px;
-      line-height: 1.16;
-      letter-spacing: 0;
-      font-weight: 700;
-    }
-
-    .subtitle {
-      margin: 0;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.4;
-    }
-
-    .toolbar {
-      position: absolute;
-      left: 24px;
-      bottom: 20px;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .view-controls {
-      position: absolute;
-      right: 24px;
-      top: 20px;
-      display: grid;
-      gap: 8px;
-      justify-items: end;
-    }
-
-    .control-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      background: rgba(255,255,255,.78);
-      border: 1px solid rgba(174,180,186,.72);
-      border-radius: 8px;
-      padding: 6px;
-      box-shadow: 0 6px 18px rgba(34,39,44,.08);
-      backdrop-filter: blur(8px);
-    }
-
-    button {
-      appearance: none;
-      border: 1px solid #aeb4ba;
-      background: #fff;
-      color: var(--ink);
-      width: 40px;
-      height: 36px;
-      border-radius: 6px;
-      font-size: 18px;
-      font-weight: 700;
-      line-height: 1;
-      box-shadow: 0 1px 2px rgba(0,0,0,.08);
-    }
-
-    button:hover { background: #f3f5f6; }
-
-    .text-button {
-      width: auto;
-      min-width: 56px;
-      padding: 0 10px;
-      font-size: 13px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .text-button.active {
-      color: #fff;
-      background: var(--ink);
-      border-color: var(--ink);
-    }
-
-    .select {
-      appearance: none;
-      border: 1px solid #aeb4ba;
-      background: #fff;
-      color: var(--ink);
-      height: 36px;
-      border-radius: 6px;
-      padding: 0 32px 0 10px;
-      font-size: 13px;
-      font-weight: 700;
-      min-width: 152px;
-      background-image:
-        linear-gradient(45deg, transparent 50%, #4d545b 50%),
-        linear-gradient(135deg, #4d545b 50%, transparent 50%);
-      background-position:
-        calc(100% - 15px) 15px,
-        calc(100% - 10px) 15px;
-      background-size: 5px 5px, 5px 5px;
-      background-repeat: no-repeat;
-    }
-
-    .sheet-toggle {
-      display: none;
-      position: absolute;
-      right: 16px;
-      bottom: 14px;
-      width: auto;
-      min-width: 42px;
-      padding: 0 12px;
-      font-size: 13px;
-      z-index: 3;
-    }
-
-    .sheet-handle {
-      display: none;
-      width: 44px;
-      height: 4px;
-      border-radius: 999px;
-      background: #c4c9ce;
-      margin: 0 auto 14px;
-    }
-
-
-    .side {
-      background: #fff;
-      border-left: 1px solid var(--line);
-      padding: 20px;
-      overflow: auto;
-    }
-
-    .section { margin-bottom: 22px; }
-
-    .section h2 {
-      margin: 0 0 10px;
-      font-size: 15px;
-      line-height: 1.2;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-
-    .spec {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px 14px;
-      font-size: 14px;
-      line-height: 1.3;
-    }
-
-    .spec div:nth-child(odd) { color: var(--muted); }
-    .spec div:nth-child(even) { font-weight: 700; text-align: right; }
-
-    .swatches {
-      display: grid;
-      gap: 10px;
-      font-size: 14px;
-    }
-
-    .swatch {
-      display: grid;
-      grid-template-columns: 28px 1fr;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .chip {
-      width: 28px;
-      height: 20px;
-      border: 1px solid #8d9399;
-      border-radius: 4px;
-    }
-
-    .note {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.45;
-      margin: 0;
-    }
-
-    .small-view {
-      height: 170px;
-      border: 1px solid var(--line);
-      background: var(--panel);
-      border-radius: 8px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .small-view svg {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    @media (max-width: 860px) {
-      body { overflow: hidden; }
-      .app { grid-template-columns: 1fr; min-height: 100vh; }
-      .viewport { height: 100vh; min-height: 0; }
-      .side {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        max-height: 58vh;
-        padding: 12px 16px 18px;
-        border-left: 0;
-        border-top: 1px solid var(--line);
-        border-radius: 14px 14px 0 0;
-        box-shadow: 0 -16px 36px rgba(24,29,34,.18);
-        transform: translateY(calc(100% - 54px));
-        transition: transform .24s ease;
-        z-index: 4;
-      }
-      body.sheet-open .side { transform: translateY(0); }
-      .sheet-handle { display: block; }
-      .sheet-toggle { display: block; }
-      .title { left: 16px; top: 14px; right: 16px; }
-      h1 { font-size: 20px; }
-      .subtitle { max-width: 330px; font-size: 13px; }
-      .toolbar { left: 16px; bottom: 14px; }
-      .view-controls {
-        left: 16px;
-        right: 16px;
-        top: 92px;
-        bottom: auto;
-        justify-items: stretch;
-        gap: 6px;
-      }
-      .control-row {
-        width: 100%;
-        max-width: none;
-        overflow: visible;
-        justify-content: flex-start;
-        padding: 5px;
-        gap: 6px;
-      }
-      button {
-        height: 42px;
-        min-width: 44px;
-        font-size: 18px;
-      }
-      .text-button {
-        min-width: 0;
-        height: 42px;
-        padding: 0 10px;
-        font-size: 14px;
-      }
-      .select {
-        height: 44px;
-        min-width: 0;
-        width: 100%;
-        font-size: 16px;
-      }
-      .route-controls {
-        flex-wrap: wrap;
-      }
-      .route-controls .select {
-        flex: 1 0 100%;
-      }
-      .route-controls .text-button {
-        flex: 1 1 calc(33.333% - 6px);
-      }
-    }
-
-    @media (max-width: 420px) {
-      h1 { font-size: 18px; }
-      .subtitle { display: none; }
-      .view-controls { top: 66px; }
-      .text-button { font-size: 13px; padding: 0 8px; }
-    }
-  </style>
+  /* десктоп: контролы вправо, столбиком */
+  @media (min-width:760px) and (pointer:fine) {
+    .bar { left:auto; right:18px; top:50%; bottom:auto; transform:translateY(-50%)!important;
+           width:250px; border:1px solid rgba(170,178,185,.55); border-radius:16px;
+           background:rgba(255,255,255,.8); padding:14px; box-shadow:0 10px 30px rgba(30,36,42,.12); }
+    .bar .grid { grid-template-columns:1fr; gap:11px; }
+    .field.city { grid-column:auto; }
+    .handle, .settings-btn { display:none; }
+    .top h1 { font-size:19px; } .top .sub { font-size:13px; }
+    .reset { right:288px; bottom:auto; top:calc(50% + 132px); }
+  }
+</style>
 </head>
 <body>
-  <main class="app">
-    <section class="viewport">
-      <canvas id="model" aria-label="Интерактивная 3D модель пикетного столбика"></canvas>
-      <div class="title">
-        <h1>Пикетный столбик 60x60 на розетке 350 мм</h1>
-        <p class="subtitle">Видимая часть столбика 250 мм, еще 50 мм профиля уходит внутрь розетки до нижнего листа.</p>
-      </div>
-      <div class="view-controls" aria-label="Быстрые виды и режимы">
-        <div class="control-row">
-          <button class="text-button" data-view="front" title="Вид спереди">Фронт</button>
-          <button class="text-button" data-view="side" title="Вид сбоку">Сбоку</button>
-          <button class="text-button" data-view="top" title="Вид сверху">Сверху</button>
-        </div>
-        <div class="control-row">
-          <button class="text-button active" id="toggleDims" title="Показать или скрыть размеры">Размеры</button>
-          <button class="text-button" id="assemble" title="Показать сборку">Сборка</button>
-        </div>
-        <div class="control-row route-controls">
-          <select class="select" id="citySelect" title="Выбрать город"></select>
-          <button class="text-button active" data-label-mode="kmBase" title="Километры на столбике, город на розетке">Км+розетка</button>
-          <button class="text-button" data-label-mode="cityPost" title="Город на столбике, километры ниже">Город</button>
-          <button class="text-button" data-label-mode="classic" title="Исходный пикетный номер">Пикет</button>
-        </div>
-      </div>
-      <div class="toolbar" aria-label="Управление видом">
-        <button id="zoomIn" title="Приблизить">+</button>
-        <button id="zoomOut" title="Отдалить">-</button>
-        <button id="reset" title="Сбросить вид">⟲</button>
-      </div>
-      <button class="sheet-toggle" id="sheetToggle" title="Открыть размеры">Размеры</button>
-    </section>
+<canvas id="c"></canvas>
 
-    <aside class="side">
-      <div class="sheet-handle" aria-hidden="true"></div>
-      <div class="section">
-        <h2>Размеры</h2>
-        <div class="spec">
-          <div>Профиль столбика</div><div>60 x 60 мм</div>
-          <div>Видимая высота</div><div>250 мм</div>
-          <div>Вставка в розетку</div><div>50 мм</div>
-          <div>Общая длина профиля</div><div>300 мм</div>
-          <div>Диаметр розетки</div><div>350 мм</div>
-          <div>Промежуточная полоса</div><div>25 мм</div>
-          <div>Конусная часть</div><div>25 мм</div>
-          <div>Толщина розетки</div><div>50 мм</div>
-          <div>Квадратный вырез</div><div>60 x 60 мм</div>
-          <div>Нижнее черное поле</div><div>105 мм</div>
-          <div>Нижний отступ цифры</div><div>25 мм</div>
-          <div>Высота цифры</div><div>75 мм</div>
-          <div>Верхний отступ цифры</div><div>25 мм</div>
-          <div>Черная крыша</div><div>20 мм</div>
-          <div>Пикетный номер</div><div>2</div>
-          <div>Ширина цифры</div><div>30 мм</div>
-          <div>Штрих цифры 1</div><div>7.5 мм</div>
-          <div>Нанесение цифры</div><div>2 стороны</div>
-          <div>Нанесение города</div><div>на розетку / столбик</div>
-          <div>Нанесение километров</div><div>на столбик</div>
-        </div>
-      </div>
+<div class="top">
+  <div>
+    <h1>Пикетный столбик · по альбому</h1>
+    <div class="sub" id="sub">Чёрно-белый, розетка под бетон</div>
+  </div>
+</div>
 
-      <div class="section">
-        <h2>Города</h2>
-        <div class="spec" id="citySpec">
-          <div>Город</div><div>Новосибирск</div>
-          <div>Расстояние</div><div>3336 км</div>
-          <div>Стиль надписи</div><div>старорусский</div>
-        </div>
-      </div>
+<button class="reset" id="reset" title="Сбросить вид" aria-label="Сбросить вид">⟲</button>
+<button class="settings-btn" id="settingsBtn">⚙ Настройки</button>
 
-      <div class="section">
-        <h2>Цвета</h2>
-        <div class="swatches">
-          <div class="swatch"><span class="chip" style="background:#b8b8b2"></span><span>Розетка под цвет бетона</span></div>
-          <div class="swatch"><span class="chip" style="background:#f7f7f2"></span><span>Белые поля столбика</span></div>
-          <div class="swatch"><span class="chip" style="background:#111"></span><span>Черная разметка по альбому</span></div>
-          <div class="swatch"><span class="chip" style="background:#b82424"></span><span>Бордовая декоративная окантовка</span></div>
-          <div class="swatch"><span class="chip" style="background:#c9a24a"></span><span>Золотистая надпись на розетке</span></div>
-        </div>
-      </div>
+<div class="bar">
+  <div class="handle" id="barHandle" title="Скрыть настройки"></div>
+  <div class="grid">
+    <div class="field"><label>Розетка</label>
+      <select id="rosette">
+        <option value="concrete">Бетон</option>
+        <option value="granite">Гранит тёмный</option>
+        <option value="steelbase">Сталь</option>
+      </select>
+    </div>
+    <div class="field"><label>Шрифт</label>
+      <select id="font">
+        <option value="russo">Russo One (РФ)</option>
+        <option value="oswald">Oswald (узкий)</option>
+        <option value="ruslan">Древнерусский</option>
+      </select>
+    </div>
+    <div class="field"><label>Надпись</label>
+      <select id="layout">
+        <option value="rosette">Город на розетке</option>
+        <option value="arc">Город дугой (по периметру)</option>
+        <option value="post">Город на столбике (бел., вертик.)</option>
+      </select>
+    </div>
+    <div class="field"><label>Размер надписи</label>
+      <select id="scale">
+        <option value="1">Обычный</option>
+        <option value="1.25">Крупнее</option>
+        <option value="1.5">Максимум</option>
+      </select>
+    </div>
+    <div class="field city"><label>Город</label>
+      <select id="city"></select>
+    </div>
+  </div>
+</div>
 
-      <div class="section">
-        <h2>Схема сверху</h2>
-        <div class="small-view">
-          <svg viewBox="0 0 300 170" role="img" aria-label="Вид сверху">
-            <defs>
-              <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-                <path d="M0,0 L10,5 L0,10 Z" fill="#30363b"></path>
-              </marker>
-            </defs>
-            <circle cx="150" cy="82" r="70" fill="#b8b8b2" stroke="#7f858a" stroke-width="2"></circle>
-            <circle cx="150" cy="82" r="61" fill="none" stroke="#8d9399" stroke-width="1.5"></circle>
-            <rect x="124" y="56" width="52" height="52" fill="#f7f7f2" stroke="#111" stroke-width="3"></rect>
-            <line x1="80" y1="154" x2="220" y2="154" stroke="#30363b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"></line>
-            <text x="150" y="148" text-anchor="middle" font-size="13" fill="#30363b">350 мм</text>
-            <line x1="124" y1="36" x2="176" y2="36" stroke="#30363b" stroke-width="1.5" marker-start="url(#arrow)" marker-end="url(#arrow)"></line>
-            <text x="150" y="29" text-anchor="middle" font-size="13" fill="#30363b">60 мм</text>
-          </svg>
-        </div>
-      </div>
+<div class="loading" id="loading"><span class="spin"></span> Загрузка…</div>
 
-      <p class="note">Разметка сделана по приложенным размерам и уменьшена в два раза. В режиме «Пикет» сохраняется исходная цифра 2, в цветных режимах километры наносятся на столбик, а город — на розетку или на столбик.</p>
-    </aside>
-  </main>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js" } }
+</script>
 
-  <script>
-    const canvas = document.getElementById('model');
-    const ctx = canvas.getContext('2d');
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from './vendor/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from './vendor/jsm/environments/RoomEnvironment.js';
 
-    const state = {
-      yaw: -0.62,
-      pitch: 0.34,
-      zoom: 1.46,
-      dragging: false,
-      lastX: 0,
-      lastY: 0,
-      pointers: new Map(),
-      pinchStartDistance: 0,
-      pinchStartZoom: 1.46,
-      showDimensions: true,
-      assemblyProgress: 1,
-      animationFrame: null,
-      cityIndex: 0,
-      labelMode: 'kmBase'
-    };
+// ---------- данные ----------
+const cities = [
+  ['Новосибирск',3336],['Чита',6194],['Ярославль',282],['Красноярск',4097],
+  ['Иркутск',5180],['Москва',0],['Санкт-Петербург',0],['Н.Новгород',440],['Самара',1099],
+  ['Воронеж',578],['Хабаровск',8522],['Ростов-на-Дону',1223],['Екатеринбург',1814],
+  ['Челябинск',2109],['Калининград',1285],['Саратов',855]
+];
+const FONTS = { russo:'Russo One', oswald:'Oswald', ruslan:'Ruslan Display' };
 
-    const assemblySteps = 8;
+// раскраска розетки (бетон + альтернативы). textCity — цвет надписи (без белого канта).
+const ROSETTE = {
+  concrete:  { name:'Бетон',         color:0xb4b1a7, metalness:0.0,  roughness:0.95, clearcoat:0,   env:0.45, textCity:'#111111' },
+  granite:   { name:'Гранит тёмный', color:0x33353a, metalness:0.15, roughness:0.42, clearcoat:0.5, env:0.8,  textCity:'#ece8df' },
+  steelbase: { name:'Сталь',         color:0xcdd2d7, metalness:1.0,  roughness:0.3,  clearcoat:0,   env:1.5,  textCity:'#15181c' }
+};
+// чёрно-белые поля столбика по «Предельному столбику» (рис.13), пропорции 170:250
+const ALB = { white:95, black:145, ink:'#15161a', paper:'#f1efe7' };
 
-    const cities = [
-      { name: 'Новосибирск', km: 3336 },
-      { name: 'Чита', km: 6194 },
-      { name: 'Ярославль', km: 282 },
-      { name: 'Красноярск', km: 4097 },
-      { name: 'Иркутск', km: 5180 },
-      { name: 'Москва', km: 0 },
-      { name: 'Питер', km: 0 },
-      { name: 'Н.Новгород', km: 440 },
-      { name: 'Самара', km: 1099 },
-      { name: 'Воронеж', km: 578 },
-      { name: 'Хабаровск', km: 8522 },
-      { name: 'Ростов', km: 1223 },
-      { name: 'Екатеринбург', km: 1814 },
-      { name: 'Челябинск', km: 2109 },
-      { name: 'Калининград', km: 1285 },
-      { name: 'Саратов', km: 855 }
-    ];
+// ---------- размеры (мм) ----------
+const D = { R:175, band:25, cone:25, post:60, postStraight:255, pyr:45 };
+D.base = D.band + D.cone; D.postTop = D.base + D.postStraight; D.apex = D.postTop + D.pyr;
 
-    const dims = {
-      radius: 175,
-      post: 60,
-      postHeight: 300,
-      visiblePost: 250,
-      insert: 50,
-      disk: 0,
-      band: 25,
-      cone: 25,
-      lowerBlack: 105,
-      digitBottomGap: 25,
-      digitHeight: 75,
-      digitWidth: 30,
-      digitTopGap: 25,
-      roofHeight: 20
-    };
+// ---------- состояние ----------
+const params = new URLSearchParams(location.search);
+const state = {
+  font:    params.get('font') || 'russo',
+  city:    params.get('city') != null ? +params.get('city') : 0,
+  rosette: params.get('rosette') || 'concrete',
+  layout:  params.get('layout') || 'rosette',   // rosette | arc | post
+  scale:   +(params.get('scale') || 1)
+};
+const headless = params.get('headless') === '1';
 
-    const colors = {
-      concrete: '#b8b8b2',
-      concreteDark: '#9d9e99',
-      concreteLight: '#d1d1cb',
-      black: '#101112',
-      white: '#f7f7f2',
-      line: '#2d3237',
-      red: '#b82424',
-      gold: '#c9a24a',
-      darkGold: '#6f5422',
-      burgundy: '#7d1f1f'
-    };
+// ---------- three ----------
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, preserveDrawingBuffer:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.3;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    function resize() {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(rect.width * dpr);
-      canvas.height = Math.floor(rect.height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      draw();
+const scene = new THREE.Scene();
+(function(){ const cv=document.createElement('canvas'); cv.width=16; cv.height=256;
+  const g=cv.getContext('2d'); const grd=g.createLinearGradient(0,0,0,256);
+  grd.addColorStop(0,'#f4f6f7'); grd.addColorStop(0.55,'#dfe4e8'); grd.addColorStop(1,'#ccd2d7');
+  g.fillStyle=grd; g.fillRect(0,0,16,256);
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; scene.background=t; })();
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(34, 1, 1, 6000);
+const target = new THREE.Vector3(0, 168, 0);
+const controls = new OrbitControls(camera, canvas);
+controls.target.copy(target);
+controls.enableDamping = true; controls.dampingFactor = 0.09;
+controls.enablePan = false;
+controls.minDistance = 300; controls.maxDistance = 1500;
+controls.minPolarAngle = 0.15; controls.maxPolarAngle = Math.PI * 0.52;
+controls.rotateSpeed = 0.9; controls.zoomSpeed = 0.9;
+
+const DEFAULT_VIEW = { az:0.62, el:0.40 };
+function applyView(az, el, dist){
+  camera.position.set(
+    target.x + dist*Math.cos(el)*Math.sin(az),
+    target.y + dist*Math.sin(el),
+    target.z + dist*Math.cos(el)*Math.cos(az));
+  camera.lookAt(target); controls.update();
+}
+// кадрирование под ориентацию: на телефоне (портрет) приподнимаем модель над нижней панелью
+function defaultFrame(){
+  const portrait = innerHeight >= innerWidth;
+  const open = document.body.classList.contains('panel-open');
+  const lift = portrait && open;             // приподнимаем модель только при открытой панели
+  target.set(0, lift ? 150 : 168, 0); controls.target.copy(target);
+  applyView(DEFAULT_VIEW.az, DEFAULT_VIEW.el, portrait ? (open ? 1020 : 950) : 860);
+}
+
+// ---------- свет + тень ----------
+const key = new THREE.DirectionalLight(0xffffff, 2.1);
+key.position.set(260,520,340); key.castShadow = true;
+key.shadow.mapSize.set(2048,2048);
+key.shadow.camera.near=50; key.shadow.camera.far=1600;
+key.shadow.camera.left=-340; key.shadow.camera.right=340; key.shadow.camera.top=340; key.shadow.camera.bottom=-340;
+key.shadow.bias=-0.0006; key.shadow.radius=6; scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.5); fill.position.set(-300,220,-160); scene.add(fill);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(3000,3000), new THREE.ShadowMaterial({ opacity:0.26 }));
+ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+
+// ---------- модель ----------
+let modelGroup = new THREE.Group(); scene.add(modelGroup);
+
+function buildModel(){
+  scene.remove(modelGroup);
+  modelGroup.traverse(o=>{ if(o.geometry) o.geometry.dispose(); if(o.material){ const m=o.material; (Array.isArray(m)?m:[m]).forEach(x=>{ if(x.map) x.map.dispose(); x.dispose&&x.dispose(); }); } });
+  modelGroup = new THREE.Group();
+
+  const R = ROSETTE[state.rosette] || ROSETTE.concrete;
+  const sc = state.scale || 1;
+  const rosetteMat = new THREE.MeshPhysicalMaterial({ color:R.color, metalness:R.metalness, roughness:R.roughness,
+    clearcoat:R.clearcoat||0, clearcoatRoughness:0.3, envMapIntensity:R.env||1 });
+  const matte = c => new THREE.MeshStandardMaterial({ color:c, metalness:0, roughness:0.82, envMapIntensity:0.35 });
+  const blackM = matte(ALB.ink);
+  const [name, km] = cities[state.city];
+  const fam = FONTS[state.font] || FONTS.forum;
+  const cityVert = state.layout==='post' ? name.toLocaleUpperCase('ru-RU') : null;  // город вертикально на столбике
+  const texMat = withNum => new THREE.MeshStandardMaterial({ map:postBWTexture(km, fam, withNum, cityVert, sc), metalness:0, roughness:0.82, envMapIntensity:0.35 });
+  // грани BoxGeometry: [+X,-X,+Y,-Y,+Z,-Z]
+  const postMat = [ texMat(false), texMat(false), blackM, blackM, texMat(true), texMat(true) ];
+
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(D.R,D.R,D.band,128), rosetteMat);
+  band.position.y=D.band/2; band.castShadow=band.receiveShadow=true; modelGroup.add(band);
+
+  const cone = new THREE.Mesh(new THREE.CylinderGeometry(42,D.R,D.cone,128), rosetteMat);
+  cone.position.y=D.band+D.cone/2; cone.castShadow=cone.receiveShadow=true; modelGroup.add(cone);
+
+  const post = new THREE.Mesh(new THREE.BoxGeometry(D.post,D.postStraight,D.post), postMat);
+  post.position.y=D.base+D.postStraight/2; post.castShadow=post.receiveShadow=true; modelGroup.add(post);
+
+  // пирамидальная заточка по фото: невысокая (~45 мм), почти острый кончик, чуть сглаженный шлифовкой
+  const pyr = new THREE.Mesh(new THREE.CylinderGeometry(5, D.post/Math.SQRT2, D.pyr, 4), blackM);
+  pyr.position.y=D.postTop+D.pyr/2; pyr.rotation.y=Math.PI/4; pyr.castShadow=true; modelGroup.add(pyr);
+
+  const weld = new THREE.Mesh(new THREE.TorusGeometry(D.post/2+3,4.5,12,48), matte(ALB.ink));
+  weld.position.y=D.base+2; weld.rotation.x=Math.PI/2; weld.castShadow=true; modelGroup.add(weld);
+
+  if(state.layout==='rosette') addCityDecal(R, name, fam, sc);
+  else if(state.layout==='arc') addCityArc(R, name, fam, sc);
+  scene.add(modelGroup);
+}
+
+// текстура грани: белое поле сверху + чёрный низ; при withNum — чёрный км в белом поле,
+// при cityVert — город белым вертикально в чёрном поле.
+function postBWTexture(km, fam, withNum, cityVert, sc){
+  sc = sc||1;
+  const w=160, h=640; const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+  const g=cv.getContext('2d'); const split=h*ALB.white/(ALB.white+ALB.black);
+  g.fillStyle=ALB.paper; g.fillRect(0,0,w,split);
+  g.fillStyle=ALB.ink;   g.fillRect(0,split,w,h-split);
+  if(withNum){ g.fillStyle=ALB.ink; g.textAlign='center'; g.textBaseline='middle';
+    let size=Math.round(86*sc); g.font=`700 ${size}px "${fam}"`;
+    while(g.measureText(String(km)).width>w-22 && size>26){ size-=2; g.font=`700 ${size}px "${fam}"`; }
+    g.fillText(String(km), w/2, split*0.46);
+    g.font=`${Math.round(size*0.34)}px "${fam}"`; g.fillText('км', w/2, split*0.46+size*0.52);
+    if(cityVert){
+      g.save(); g.fillStyle=ALB.paper; g.textAlign='center'; g.textBaseline='middle';
+      g.translate(w/2, split+(h-split)/2); g.rotate(-Math.PI/2);
+      let cs=Math.round(40*sc); g.font=`${cs}px "${fam}"`;
+      while(g.measureText(cityVert).width>(h-split)-34 && cs>13){ cs-=1; g.font=`${cs}px "${fam}"`; }
+      g.fillText(cityVert, 0, 0); g.restore();
     }
-
-    function rotatePoint(p) {
-      const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw);
-      const cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
-      const x1 = p.x * cy - p.z * sy;
-      const z1 = p.x * sy + p.z * cy;
-      const y1 = p.y * cp - z1 * sp;
-      const z2 = p.y * sp + z1 * cp;
-      return { x: x1, y: y1, z: z2 };
-    }
-
-    function project(p) {
-      const rect = canvas.getBoundingClientRect();
-      const r = rotatePoint({ x: p.x, y: p.y - 160, z: p.z });
-      const scale = state.zoom * Math.min(rect.width, rect.height) / 560;
-      return {
-        x: rect.width / 2 + r.x * scale,
-        y: rect.height / 2 - r.y * scale + 34,
-        z: r.z,
-        scale
-      };
-    }
-
-    function shade(hex, factor) {
-      const n = parseInt(hex.slice(1), 16);
-      let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-      r = Math.max(0, Math.min(255, Math.round(r * factor)));
-      g = Math.max(0, Math.min(255, Math.round(g * factor)));
-      b = Math.max(0, Math.min(255, Math.round(b * factor)));
-      return `rgb(${r},${g},${b})`;
-    }
-
-    function faceDepth(points) {
-      return points.reduce((sum, p) => sum + rotatePoint({ x: p.x, y: p.y - 160, z: p.z }).z, 0) / points.length;
-    }
-
-    function normal(points) {
-      const a = points[0], b = points[1], c = points[2];
-      const u = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
-      const v = { x: c.x - a.x, y: c.y - a.y, z: c.z - a.z };
-      return {
-        x: u.y * v.z - u.z * v.y,
-        y: u.z * v.x - u.x * v.z,
-        z: u.x * v.y - u.y * v.x
-      };
-    }
-
-    function addPoly(mesh, points, fill, stroke = 'rgba(20,24,28,.34)', tag = '') {
-      const n = normal(points);
-      const light = { x: -0.4, y: 0.8, z: 0.35 };
-      const len = Math.hypot(n.x, n.y, n.z) || 1;
-      const dot = (n.x * light.x + n.y * light.y + n.z * light.z) / len;
-      const poly = {
-        points,
-        fill: fill.startsWith('#') ? shade(fill, 0.78 + Math.max(-0.18, dot) * 0.26) : fill,
-        stroke,
-        depth: faceDepth(points),
-        tag,
-        stage: 0
-      };
-      mesh.push(poly);
-      return poly;
-    }
-
-    function circlePoint(r, y, a) {
-      return { x: Math.cos(a) * r, y, z: Math.sin(a) * r };
-    }
-
-    function squarePoint(half, y, a) {
-      const c = Math.cos(a), s = Math.sin(a);
-      const m = half / Math.max(Math.abs(c), Math.abs(s));
-      return { x: c * m, y, z: s * m };
-    }
-
-    function cylinder(mesh, radius, y0, y1, fill, segments = 80) {
-      const top = [], bottom = [];
-      for (let i = 0; i < segments; i++) {
-        const a0 = i / segments * Math.PI * 2;
-        const a1 = (i + 1) / segments * Math.PI * 2;
-        const p0 = circlePoint(radius, y0, a0);
-        const p1 = circlePoint(radius, y0, a1);
-        const p2 = circlePoint(radius, y1, a1);
-        const p3 = circlePoint(radius, y1, a0);
-        const side = addPoly(mesh, [p0, p1, p2, p3], fill);
-        side.stage = 2;
-        top.push(p3);
-        bottom.push(p0);
-      }
-      const topPoly = addPoly(mesh, top, colors.concreteLight, 'rgba(20,24,28,.25)', 'top');
-      const bottomPoly = addPoly(mesh, bottom.reverse(), colors.concreteDark, 'rgba(20,24,28,.2)');
-      topPoly.stage = 3;
-      bottomPoly.stage = 1;
-    }
-
-    function coneWithSquareHole(mesh) {
-      const segments = 96;
-      const y0 = dims.disk + dims.band;
-      const coneProgress = assemblyPhase(4);
-      const y1 = y0 + Math.max(1, dims.cone * coneProgress);
-      const holeProgress = assemblyPhase(5);
-      const half = dims.post / 2 + 3;
-      const topHalf = half + (1 - holeProgress) * (dims.radius - half);
-      for (let i = 0; i < segments; i++) {
-        const a0 = i / segments * Math.PI * 2;
-        const a1 = (i + 1) / segments * Math.PI * 2;
-        const p0 = circlePoint(dims.radius, y0, a0);
-        const p1 = circlePoint(dims.radius, y0, a1);
-        const p2 = squarePoint(topHalf, y1, a1);
-        const p3 = squarePoint(topHalf, y1, a0);
-        const cone = addPoly(mesh, [p0, p1, p2, p3], colors.concrete);
-        cone.stage = 4;
-      }
-      if (holeProgress < 0.98) return;
-      const h = half;
-      const rim = [
-        [{x:-h,y:y1,z:-h},{x:h,y:y1,z:-h},{x:h,y:y1+2,z:-h},{x:-h,y:y1+2,z:-h}],
-        [{x:h,y:y1,z:-h},{x:h,y:y1,z:h},{x:h,y:y1+2,z:h},{x:h,y:y1+2,z:-h}],
-        [{x:h,y:y1,z:h},{x:-h,y:y1,z:h},{x:-h,y:y1+2,z:h},{x:h,y:y1+2,z:h}],
-        [{x:-h,y:y1,z:h},{x:-h,y:y1,z:-h},{x:-h,y:y1+2,z:-h},{x:-h,y:y1+2,z:h}]
-      ];
-      rim.forEach(p => {
-        const poly = addPoly(mesh, p, '#2b2d30', 'rgba(0,0,0,.45)');
-        poly.stage = 5;
-      });
-    }
-
-    function box(mesh, x0, x1, y0, y1, z0, z1, fill, tag = '', stage = 3) {
-      const p = {
-        nwb: {x:x0,y:y0,z:z0}, neb: {x:x1,y:y0,z:z0}, seb: {x:x1,y:y0,z:z1}, swb: {x:x0,y:y0,z:z1},
-        nwt: {x:x0,y:y1,z:z0}, net: {x:x1,y:y1,z:z0}, set: {x:x1,y:y1,z:z1}, swt: {x:x0,y:y1,z:z1}
-      };
-      const faces = [
-        addPoly(mesh, [p.nwb,p.neb,p.net,p.nwt], fill, 'rgba(0,0,0,.32)', tag),
-        addPoly(mesh, [p.neb,p.seb,p.set,p.net], fill, 'rgba(0,0,0,.32)', tag),
-        addPoly(mesh, [p.seb,p.swb,p.swt,p.set], fill, 'rgba(0,0,0,.32)', tag),
-        addPoly(mesh, [p.swb,p.nwb,p.nwt,p.swt], fill, 'rgba(0,0,0,.32)', tag),
-        addPoly(mesh, [p.nwt,p.net,p.set,p.swt], fill, 'rgba(0,0,0,.28)', tag)
-      ];
-      faces.forEach(face => { face.stage = stage; });
-    }
-
-    function makeMesh() {
-      const mesh = [];
-      cylinder(mesh, dims.radius, 0, dims.band, colors.concrete, 96);
-      coneWithSquareHole(mesh);
-
-      const base = dims.disk + dims.band + dims.cone;
-      const h = dims.post / 2;
-      const paintProgress = assemblyPhase(8);
-      const unpainted = '#ece8dc';
-      box(mesh, -h, h, 0, base, -h, h, '#4b4d4f', 'insert', 6);
-      const segments = [
-        [0, dims.lowerBlack, paintProgress > 0.55 ? colors.black : unpainted],
-        [dims.lowerBlack, dims.visiblePost - dims.roofHeight, colors.white]
-      ];
-      segments.forEach(([a, b, color]) => box(mesh, -h, h, base + a, base + b, -h, h, color, 'post', 6));
-      houseTop(mesh, base + dims.visiblePost - dims.roofHeight, base + dims.visiblePost, h);
-      box(mesh, -h - 2, h + 2, base - 4, base + 4, -h - 2, h + 2, '#4b4d4f', 'weld', 7);
-      return mesh;
-    }
-
-    function houseTop(mesh, y0, y1, h) {
-      const eave = y0;
-      const ridgeY = y1;
-      const ridge = { x: 0, y: ridgeY, z: -h };
-      const ridgeBack = { x: 0, y: ridgeY, z: h };
-      const p = {
-        fl: { x: -h, y: eave, z: -h },
-        fr: { x: h, y: eave, z: -h },
-        bl: { x: -h, y: eave, z: h },
-        br: { x: h, y: eave, z: h }
-      };
-      [
-        addPoly(mesh, [p.fl, p.fr, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof'),
-        addPoly(mesh, [p.br, p.bl, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof'),
-        addPoly(mesh, [p.fr, p.br, ridgeBack, ridge], colors.black, 'rgba(0,0,0,.36)', 'roof'),
-        addPoly(mesh, [p.bl, p.fl, ridge, ridgeBack], colors.black, 'rgba(0,0,0,.36)', 'roof')
-      ].forEach(poly => { poly.stage = 8; });
-    }
-
-    function drawPoly(poly) {
-      if (!stageVisible(poly.stage)) return;
-      const pts = animatedPoints(poly).map(project);
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.closePath();
-      ctx.fillStyle = poly.fill;
-      ctx.fill();
-      ctx.strokeStyle = poly.stroke;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-
-    function stageVisible(stage) {
-      if (stage === 0) return true;
-      return assemblyPhase(stage) > 0 || state.assemblyProgress >= 1;
-    }
-
-    function assemblyPhase(stage) {
-      if (state.assemblyProgress >= 1) return 1;
-      const start = (stage - 1) / assemblySteps;
-      const end = stage / assemblySteps;
-      return Math.max(0, Math.min(1, (state.assemblyProgress - start) / (end - start)));
-    }
-
-    function animatedPoints(poly) {
-      const offsetY = assemblyYOffset(poly.stage);
-      if (!offsetY) return poly.points;
-      return poly.points.map(point => ({ x: point.x, y: point.y + offsetY, z: point.z }));
-    }
-
-    function assemblyYOffset(stage) {
-      if (state.assemblyProgress >= 1) return 0;
-      if (stage === 2) return (1 - easeOutCubic(assemblyPhase(2))) * 24;
-      if (stage === 3) return (1 - easeOutCubic(assemblyPhase(3))) * 62;
-      if (stage === 6) return (1 - easeOutCubic(assemblyPhase(6))) * 170;
-      return 0;
-    }
-
-    function line3(a, b, style = colors.line, width = 1.2) {
-      const p = project(a), q = project(b);
-      ctx.strokeStyle = style;
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(q.x, q.y);
-      ctx.stroke();
-      return [p, q];
-    }
-
-    function label3(text, p, dx = 0, dy = 0, color = colors.line) {
-      const q = project(p);
-      ctx.save();
-      ctx.font = '700 13px Arial, Helvetica, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const metrics = ctx.measureText(text);
-      const x = q.x + dx, y = q.y + dy;
-      ctx.fillStyle = 'rgba(255,255,255,.78)';
-      ctx.fillRect(x - metrics.width / 2 - 5, y - 9, metrics.width + 10, 18);
-      ctx.fillStyle = color;
-      ctx.fillText(text, x, y);
-      ctx.restore();
-    }
-
-    function drawArrow(from, to) {
-      const angle = Math.atan2(to.y - from.y, to.x - from.x);
-      ctx.beginPath();
-      ctx.moveTo(to.x, to.y);
-      ctx.lineTo(to.x - 8 * Math.cos(angle - .45), to.y - 8 * Math.sin(angle - .45));
-      ctx.moveTo(to.x, to.y);
-      ctx.lineTo(to.x - 8 * Math.cos(angle + .45), to.y - 8 * Math.sin(angle + .45));
-      ctx.stroke();
-    }
-
-    function dimLine(a, b, text, offset = {x:0,y:0,z:0}) {
-      const aa = {x:a.x+offset.x,y:a.y+offset.y,z:a.z+offset.z};
-      const bb = {x:b.x+offset.x,y:b.y+offset.y,z:b.z+offset.z};
-      const [p, q] = line3(aa, bb, colors.line, 1.4);
-      drawArrow(q, p);
-      drawArrow(p, q);
-      label3(text, {x:(aa.x+bb.x)/2,y:(aa.y+bb.y)/2,z:(aa.z+bb.z)/2}, 0, -14);
-      line3(a, aa, 'rgba(45,50,55,.45)', 1);
-      line3(b, bb, 'rgba(45,50,55,.45)', 1);
-    }
-
-    function drawDimensions() {
-      if (!state.showDimensions) return;
-      if (state.assemblyProgress < 0.96) return;
-      const top = dims.disk + dims.band + dims.cone;
-      dimLine({x:-175,y:0,z:185},{x:175,y:0,z:185}, '350 мм', {x:0,y:0,z:22});
-      dimLine({x:66,y:top,z:-30},{x:66,y:top+dims.visiblePost,z:-30}, '250 мм', {x:52,y:0,z:0});
-      dimLine({x:-78,y:0,z:-30},{x:-78,y:top,z:-30}, '50 мм в розетке', {x:-52,y:0,z:0});
-      dimLine({x:112,y:0,z:-30},{x:112,y:top+dims.visiblePost,z:-30}, '300 мм профиль', {x:92,y:0,z:0});
-      dimLine({x:-30,y:top+dims.visiblePost+18,z:-30},{x:30,y:top+dims.visiblePost+18,z:-30}, '60 мм', {x:0,y:0,z:-28});
-      dimLine({x:-66,y:top,z:42},{x:-66,y:top+dims.lowerBlack,z:42}, '105 мм', {x:-46,y:0,z:0});
-      dimLine({x:-40,y:top+dims.lowerBlack,z:50},{x:-40,y:top+dims.lowerBlack+dims.digitBottomGap,z:50}, '25 мм', {x:-26,y:0,z:0});
-      dimLine({x:-18,y:top+dims.lowerBlack+dims.digitBottomGap,z:50},{x:-18,y:top+dims.lowerBlack+dims.digitBottomGap+dims.digitHeight,z:50}, '75 мм цифра', {x:-24,y:0,z:0});
-      dimLine({x:30,y:top+dims.visiblePost-dims.roofHeight-dims.digitTopGap,z:50},{x:30,y:top+dims.visiblePost-dims.roofHeight,z:50}, '25 мм', {x:24,y:0,z:0});
-      dimLine({x:54,y:top+dims.visiblePost-dims.roofHeight,z:50},{x:54,y:top+dims.visiblePost,z:50}, '20 мм', {x:26,y:0,z:0});
-      dimLine({x:-190,y:0,z:-168},{x:-190,y:dims.band,z:-168}, '25 мм', {x:-18,y:0,z:0});
-      dimLine({x:190,y:dims.band,z:-168},{x:190,y:top,z:-168}, '25 мм', {x:18,y:0,z:0});
-    }
-
-    function drawGround() {
-      const rect = canvas.getBoundingClientRect();
-      ctx.save();
-      ctx.fillStyle = 'rgba(255,255,255,.42)';
-      ctx.beginPath();
-      const a = project({x:-310,y:0,z:-250});
-      const b = project({x:310,y:0,z:-250});
-      const c = project({x:360,y:0,z:260});
-      const d = project({x:-360,y:0,z:260});
-      ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.lineTo(c.x,c.y); ctx.lineTo(d.x,d.y); ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(120,128,135,.22)';
-      for (let i = -300; i <= 300; i += 50) {
-        line3({x:i,y:0,z:-260},{x:i,y:0,z:260}, 'rgba(120,128,135,.18)', .8);
-        line3({x:-330,y:0,z:i},{x:330,y:0,z:i}, 'rgba(120,128,135,.18)', .8);
-      }
-      ctx.restore();
-    }
-
-    function drawDecals() {
-      if (!stageVisible(8)) return;
-      const side = visibleDigitSide();
-      if (state.labelMode !== 'classic') drawPostTrim(side);
-      if (state.labelMode === 'classic') drawDigitDecal(side);
-      drawRouteDecal(side);
-      drawRosetteDecal(side);
-    }
-
-    function drawAssemblyEffects() {
-      const cut = assemblyPhase(5);
-      const weld = assemblyPhase(7);
-      if (cut > 0 && cut < 1) {
-        const top = dims.disk + dims.band + dims.cone + 2;
-        const h = dims.post / 2 + 4;
-        ctx.save();
-        ctx.strokeStyle = `rgba(184,36,36,${0.25 + cut * 0.55})`;
-        ctx.lineWidth = 2;
-        line3({x:-h,y:top,z:-h},{x:h,y:top,z:-h}, colors.red, 2);
-        line3({x:h,y:top,z:-h},{x:h,y:top,z:h}, colors.red, 2);
-        line3({x:h,y:top,z:h},{x:-h,y:top,z:h}, colors.red, 2);
-        line3({x:-h,y:top,z:h},{x:-h,y:top,z:-h}, colors.red, 2);
-        ctx.restore();
-      }
-
-      if (weld > 0 && weld < 1) {
-        const pulse = Math.sin(weld * Math.PI);
-        const top = dims.disk + dims.band + dims.cone + 3;
-        const h = dims.post / 2 + 7 + pulse * 4;
-        ctx.save();
-        ctx.shadowColor = 'rgba(255,120,32,.65)';
-        ctx.shadowBlur = 12 * pulse;
-        line3({x:-h,y:top,z:-h},{x:h,y:top,z:-h}, `rgba(255,105,36,${pulse})`, 3);
-        line3({x:h,y:top,z:-h},{x:h,y:top,z:h}, `rgba(255,105,36,${pulse})`, 3);
-        line3({x:h,y:top,z:h},{x:-h,y:top,z:h}, `rgba(255,105,36,${pulse})`, 3);
-        line3({x:-h,y:top,z:h},{x:-h,y:top,z:-h}, `rgba(255,105,36,${pulse})`, 3);
-        ctx.restore();
-      }
-    }
-
-    function visibleDigitSide() {
-      const frontDepth = rotatePoint({ x: 0, y: 0, z: -dims.post / 2 }).z;
-      const backDepth = rotatePoint({ x: 0, y: 0, z: dims.post / 2 }).z;
-      return frontDepth > backDepth ? 'front' : 'back';
-    }
-
-    function drawDigitDecal(side) {
-      const base = dims.disk + dims.band + dims.cone;
-      const h = dims.post / 2;
-      const yBottom = base + dims.lowerBlack + dims.digitBottomGap;
-      const yTop = yBottom + dims.digitHeight;
-      const z = side === 'front' ? -h - 1.4 : h + 1.4;
-      const xUnit = side === 'front' ? -1 : 1;
-
-      const origin = project({ x: 0, y: yTop, z });
-      const xAxis = project({ x: xUnit, y: yTop, z });
-      const yAxis = project({ x: 0, y: yTop - 1, z });
-      const ux = { x: xAxis.x - origin.x, y: xAxis.y - origin.y };
-      const uy = { x: yAxis.x - origin.x, y: yAxis.y - origin.y };
-      const rect = canvas.getBoundingClientRect();
-      const dpr = canvas.width / rect.width;
-
-      ctx.save();
-      ctx.setTransform(ux.x * dpr, ux.y * dpr, uy.x * dpr, uy.y * dpr, origin.x * dpr, origin.y * dpr);
-      ctx.fillStyle = colors.black;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.font = `900 ${dims.digitHeight}px Arial Narrow, Arial, Helvetica, sans-serif`;
-      ctx.fillText('2', 0, 0, dims.digitWidth);
-      ctx.restore();
-    }
-
-    function oldRussianFont(size, weight = 700) {
-      return `${weight} ${size}px Georgia, "Times New Roman", Times, serif`;
-    }
-
-    function activeCity() {
-      return cities[state.cityIndex] || cities[0];
-    }
-
-    function decorativeName(name) {
-      return name.toLocaleUpperCase('ru-RU').replace('Н.НОВГОРОД', 'Н. НОВГОРОД');
-    }
-
-    function faceTransform(side, yTop, z, xUnit = null) {
-      const direction = xUnit === null ? (side === 'front' ? -1 : 1) : xUnit;
-      const origin = project({ x: 0, y: yTop, z });
-      const xAxis = project({ x: direction, y: yTop, z });
-      const yAxis = project({ x: 0, y: yTop - 1, z });
-      const ux = { x: xAxis.x - origin.x, y: xAxis.y - origin.y };
-      const uy = { x: yAxis.x - origin.x, y: yAxis.y - origin.y };
-      const rect = canvas.getBoundingClientRect();
-      const dpr = canvas.width / rect.width;
-      ctx.setTransform(ux.x * dpr, ux.y * dpr, uy.x * dpr, uy.y * dpr, origin.x * dpr, origin.y * dpr);
-    }
-
-    function drawPostTrim(side) {
-      const base = dims.disk + dims.band + dims.cone;
-      const h = dims.post / 2;
-      const z = side === 'front' ? -h - 1.2 : h + 1.2;
-      const xLeft = side === 'front' ? h - 5 : -h + 5;
-      const xRight = side === 'front' ? -h + 5 : h - 5;
-      const y0 = base + dims.lowerBlack + 8;
-      const y1 = base + dims.visiblePost - dims.roofHeight - 8;
-      line3({ x: xLeft, y: y0, z }, { x: xLeft, y: y1, z }, colors.burgundy, 2.2);
-      line3({ x: xRight, y: y0, z }, { x: xRight, y: y1, z }, colors.burgundy, 2.2);
-      line3({ x: xLeft, y: y1, z }, { x: xRight, y: y1, z }, colors.gold, 1.6);
-      line3({ x: xLeft, y: y0, z }, { x: xRight, y: y0, z }, colors.gold, 1.6);
-    }
-
-    function drawRouteDecal(side) {
-      if (state.labelMode === 'classic') return;
-      const city = activeCity();
-      const base = dims.disk + dims.band + dims.cone;
-      const h = dims.post / 2;
-      const z = side === 'front' ? -h - 1.6 : h + 1.6;
-      const yTop = base + dims.visiblePost - dims.roofHeight - 18;
-
-      ctx.save();
-      faceTransform(side, yTop, z);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = colors.black;
-      ctx.strokeStyle = colors.gold;
-      ctx.lineWidth = 1.1;
-
-      if (state.labelMode === 'cityPost') {
-        const name = decorativeName(city.name);
-        const nameSize = name.length > 10 ? 12 : 14;
-        ctx.font = oldRussianFont(nameSize, 700);
-        ctx.fillText(name, 0, 18, 52);
-        ctx.font = oldRussianFont(16, 700);
-        ctx.fillText(`${city.km} км`, 0, 42, 50);
-      } else {
-        ctx.font = oldRussianFont(30, 800);
-        ctx.fillText(String(city.km), 0, 24, 52);
-        ctx.font = oldRussianFont(15, 700);
-        ctx.fillText('км', 0, 52, 42);
-      }
-      ctx.restore();
-    }
-
-    function drawRosetteDecal(side) {
-      if (state.labelMode === 'classic') return;
-      const city = activeCity();
-      const z = side === 'front' ? -dims.radius - 2 : dims.radius + 2;
-      const yTop = dims.band + 17;
-      const name = decorativeName(city.name);
-
-      ctx.save();
-      faceTransform(side, yTop, z);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineJoin = 'round';
-
-      const plaqueWidth = Math.min(270, Math.max(130, name.length * 13 + 44));
-      ctx.fillStyle = 'rgba(72,59,42,.74)';
-      ctx.strokeStyle = colors.gold;
-      ctx.lineWidth = 2.2;
-      roundRect(-plaqueWidth / 2, -10, plaqueWidth, 22, 8);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.font = oldRussianFont(name.length > 11 ? 17 : 20, 800);
-      ctx.strokeStyle = 'rgba(40,28,14,.7)';
-      ctx.lineWidth = 2.8;
-      ctx.strokeText(name, 0, 1, plaqueWidth - 18);
-      ctx.fillStyle = '#f2d47c';
-      ctx.fillText(name, 0, 1, plaqueWidth - 18);
-      ctx.restore();
-    }
-
-    function roundRect(x, y, width, height, radius) {
-      const r = Math.min(radius, width / 2, height / 2);
-      ctx.beginPath();
-      ctx.moveTo(x + r, y);
-      ctx.lineTo(x + width - r, y);
-      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-      ctx.lineTo(x + width, y + height - r);
-      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-      ctx.lineTo(x + r, y + height);
-      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-      ctx.lineTo(x, y + r);
-      ctx.quadraticCurveTo(x, y, x + r, y);
-      ctx.closePath();
-    }
-
-    function draw() {
-      const rect = canvas.getBoundingClientRect();
-      ctx.clearRect(0, 0, rect.width, rect.height);
-      drawGround();
-      const mesh = makeMesh().sort((a, b) => a.depth - b.depth);
-      mesh.forEach(drawPoly);
-      drawAssemblyEffects();
-      drawDecals();
-      drawDimensions();
-    }
-
-    canvas.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      state.dragging = true;
-      state.lastX = e.clientX;
-      state.lastY = e.clientY;
-      canvas.setPointerCapture(e.pointerId);
-      if (state.pointers.size === 2) {
-        state.pinchStartDistance = activePointerDistance();
-        state.pinchStartZoom = state.zoom;
-      }
-    });
-
-    canvas.addEventListener('pointermove', e => {
-      if (!state.pointers.has(e.pointerId)) return;
-      e.preventDefault();
-      const previous = state.pointers.get(e.pointerId);
-      state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      if (state.pointers.size >= 2) {
-        const distance = activePointerDistance();
-        if (state.pinchStartDistance > 0) {
-          state.zoom = clampZoom(state.pinchStartZoom * distance / state.pinchStartDistance);
-          draw();
-        }
-        return;
-      }
-
-      if (!state.dragging || !previous) return;
-      const dx = e.clientX - previous.x;
-      const dy = e.clientY - previous.y;
-      state.lastX = e.clientX;
-      state.lastY = e.clientY;
-      state.yaw += dx * 0.008;
-      state.pitch = Math.max(-0.75, Math.min(0.9, state.pitch + dy * 0.006));
-      draw();
-    });
-
-    function finishPointer(e) {
-      state.pointers.delete(e.pointerId);
-      state.dragging = state.pointers.size > 0;
-      if (state.pointers.size === 1) {
-        const point = [...state.pointers.values()][0];
-        state.lastX = point.x;
-        state.lastY = point.y;
-      }
-      state.pinchStartDistance = 0;
-      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-    }
-
-    canvas.addEventListener('pointerup', finishPointer);
-    canvas.addEventListener('pointercancel', finishPointer);
-
-    canvas.addEventListener('wheel', e => {
-      e.preventDefault();
-      state.zoom = clampZoom(state.zoom * (e.deltaY > 0 ? 0.92 : 1.08));
-      draw();
-    }, { passive: false });
-
-    function activePointerDistance() {
-      const points = [...state.pointers.values()];
-      if (points.length < 2) return 0;
-      return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
-    }
-
-    function clampZoom(value) {
-      return Math.max(0.7, Math.min(2.6, value));
-    }
-
-    document.getElementById('zoomIn').addEventListener('click', () => {
-      state.zoom = Math.min(2.6, state.zoom * 1.12);
-      draw();
-    });
-
-    document.getElementById('zoomOut').addEventListener('click', () => {
-      state.zoom = Math.max(0.7, state.zoom / 1.12);
-      draw();
-    });
-
-    document.getElementById('reset').addEventListener('click', () => {
-      state.yaw = -0.62;
-      state.pitch = 0.34;
-      state.zoom = 1.46;
-      state.assemblyProgress = 1;
-      draw();
-    });
-
-    document.querySelectorAll('[data-view]').forEach(button => {
-      button.addEventListener('click', () => {
-        const view = button.dataset.view;
-        const presets = {
-          front: { yaw: 0, pitch: 0.12, zoom: 1.55 },
-          side: { yaw: Math.PI / 2, pitch: 0.16, zoom: 1.42 },
-          top: { yaw: -0.4, pitch: 0.9, zoom: 1.28 }
-        };
-        const preset = presets[view];
-        if (!preset) return;
-        document.querySelectorAll('[data-view]').forEach(item => item.classList.remove('active'));
-        button.classList.add('active');
-        state.yaw = preset.yaw;
-        state.pitch = preset.pitch;
-        state.zoom = preset.zoom;
-        draw();
-      });
-    });
-
-    document.getElementById('toggleDims').addEventListener('click', event => {
-      state.showDimensions = !state.showDimensions;
-      event.currentTarget.classList.toggle('active', state.showDimensions);
-      draw();
-    });
-
-    document.getElementById('assemble').addEventListener('click', event => {
-      runAssembly();
-      event.currentTarget.classList.add('active');
-      window.setTimeout(() => event.currentTarget.classList.remove('active'), 1250);
-    });
-
-    document.getElementById('sheetToggle').addEventListener('click', () => {
-      document.body.classList.toggle('sheet-open');
-    });
-
-    document.querySelector('.sheet-handle').addEventListener('click', () => {
-      document.body.classList.toggle('sheet-open');
-    });
-
-    function runAssembly() {
-      if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
-      const start = performance.now();
-      const duration = 3200;
-      const startView = { yaw: -0.9, pitch: 0.34, zoom: 1.22 };
-      const endView = { yaw: 0, pitch: 0.14, zoom: 1.56 };
-      state.assemblyProgress = 0;
-      state.showDimensions = true;
-      document.getElementById('toggleDims').classList.add('active');
-      const step = now => {
-        const t = Math.min(1, (now - start) / duration);
-        state.assemblyProgress = t;
-        const camera = easeInOut(t);
-        state.yaw = lerp(startView.yaw, endView.yaw, camera);
-        state.pitch = lerp(startView.pitch, endView.pitch, camera);
-        state.zoom = lerp(startView.zoom, endView.zoom, camera);
-        draw();
-        if (t < 1) {
-          state.animationFrame = requestAnimationFrame(step);
-        } else {
-          state.assemblyProgress = 1;
-          state.animationFrame = null;
-          draw();
-        }
-      };
-      state.animationFrame = requestAnimationFrame(step);
-    }
-
-    function easeOutCubic(t) {
-      return 1 - Math.pow(1 - t, 3);
-    }
-
-    function easeInOut(t) {
-      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    }
-
-    function lerp(a, b, t) {
-      return a + (b - a) * t;
-    }
-
-    function initCityControls() {
-      const select = document.getElementById('citySelect');
-      cities.forEach((city, index) => {
-        const option = document.createElement('option');
-        option.value = String(index);
-        option.textContent = `${city.name} ${city.km} км`;
-        select.appendChild(option);
-      });
-      select.value = String(state.cityIndex);
-      select.addEventListener('change', event => {
-        state.cityIndex = Number(event.currentTarget.value) || 0;
-        updateCitySpec();
-        draw();
-      });
-
-      document.querySelectorAll('[data-label-mode]').forEach(button => {
-        button.addEventListener('click', () => {
-          state.labelMode = button.dataset.labelMode;
-          document.querySelectorAll('[data-label-mode]').forEach(item => {
-            item.classList.toggle('active', item === button);
-          });
-          updateCitySpec();
-          draw();
-        });
-      });
-
-      updateCitySpec();
-    }
-
-    function updateCitySpec() {
-      const city = activeCity();
-      const spec = document.getElementById('citySpec');
-      const modeText = {
-        kmBase: 'км на столбике, город на розетке',
-        cityPost: 'город и км на столбике',
-        classic: 'исходный пикетный номер'
-      }[state.labelMode] || 'км на столбике';
-      spec.innerHTML = `
-          <div>Город</div><div>${city.name}</div>
-          <div>Расстояние</div><div>${city.km} км</div>
-          <div>Нанесение</div><div>${modeText}</div>
-          <div>Стиль надписи</div><div>старорусский</div>
-        `;
-    }
-
-    window.addEventListener('resize', resize);
-    initCityControls();
-    resize();
-  </script>
+  }
+  const t=new THREE.CanvasTexture(cv); t.anisotropy=8; t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+// город прямой строкой на переднем склоне розетки (без белого канта, чисто цветом)
+function addCityDecal(R, name, fam, sc){
+  sc = sc||1;
+  const W=250, H=54, s=4;
+  const cv=document.createElement('canvas'); cv.width=W*s; cv.height=H*s;
+  const g=cv.getContext('2d'); g.scale(s,s);
+  g.textAlign='center'; g.textBaseline='middle';
+  let size=42; g.font=`${size}px "${fam}"`; const up=name.toLocaleUpperCase('ru-RU');
+  while(g.measureText(up).width>W-20 && size>15){ size-=1; g.font=`${size}px "${fam}"`; }
+  g.fillStyle=R.textCity; g.fillText(up,W/2,H/2);
+  const tex=new THREE.CanvasTexture(cv); tex.anisotropy=8; tex.colorSpace=THREE.SRGBColorSpace;
+  const mat=new THREE.MeshStandardMaterial({ map:tex, transparent:true, roughness:0.6, metalness:0,
+    polygonOffset:true, polygonOffsetFactor:-6, polygonOffsetUnits:-6, depthWrite:false });
+  const pw=Math.min(312, 200*sc);
+  const plane=new THREE.Mesh(new THREE.PlaneGeometry(pw, pw*H/W), mat);
+  plane.position.set(0,36.5,112); plane.rotation.x=-(Math.PI/2)+0.30; plane.renderOrder=2;
+  modelGroup.add(plane);
+}
+
+// город «дугой по периметру» — обёрнут вокруг конуса розетки
+function addCityArc(R, name, fam, sc){
+  sc = sc||1;
+  const W=4096, H=512; const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d'); g.clearRect(0,0,W,H);
+  g.textAlign='center'; g.textBaseline='middle'; g.fillStyle=R.textCity;
+  let size=Math.round(230*sc); g.font=`${size}px "${fam}"`; const up=name.toLocaleUpperCase('ru-RU');
+  while(g.measureText(up).width>W*0.46 && size>60){ size-=4; g.font=`${size}px "${fam}"`; }
+  g.fillText(up, W*0.5, H*0.46);                 // перёд розетки = центр развёртки конуса
+  const tex=new THREE.CanvasTexture(cv); tex.anisotropy=8; tex.colorSpace=THREE.SRGBColorSpace;
+  tex.wrapS=THREE.ClampToEdgeWrapping; tex.wrapT=THREE.ClampToEdgeWrapping;
+  const mat=new THREE.MeshStandardMaterial({ map:tex, transparent:true, roughness:0.6, metalness:0, side:THREE.DoubleSide,
+    polygonOffset:true, polygonOffsetFactor:-8, polygonOffsetUnits:-8, depthWrite:false });
+  const shell=new THREE.Mesh(new THREE.CylinderGeometry(42.4, D.R+0.5, D.cone, 160, 1, true), mat);
+  shell.position.y=D.band+D.cone/2; shell.rotation.y=Math.PI;   // шов на заднюю сторону, перёд = центр текстуры
+  shell.renderOrder=2; modelGroup.add(shell);
+}
+
+// ---------- UI ----------
+const citySel=document.getElementById('city');
+cities.forEach(([n,k],i)=>{ const o=document.createElement('option'); o.value=i; o.textContent=`${n}${k?(' · '+k+' км'):''}`; citySel.appendChild(o); });
+document.getElementById('rosette').value=state.rosette;
+document.getElementById('font').value=state.font;
+document.getElementById('layout').value=state.layout;
+document.getElementById('scale').value=String(state.scale);
+citySel.value=state.city;
+function updateSub(){ const R=ROSETTE[state.rosette]||ROSETTE.concrete; const [n,k]=cities[state.city];
+  document.getElementById('sub').textContent=`Розетка: ${R.name} · ${n}${k?(' · '+k+' км'):''}`; }
+function rebuild(){ buildModel(); updateSub(); }
+document.getElementById('rosette').addEventListener('change',e=>{ state.rosette=e.target.value; rebuild(); });
+document.getElementById('font').addEventListener('change',e=>{ state.font=e.target.value; rebuild(); });
+document.getElementById('layout').addEventListener('change',e=>{ state.layout=e.target.value; rebuild(); });
+document.getElementById('scale').addEventListener('change',e=>{ state.scale=+e.target.value; rebuild(); });
+citySel.addEventListener('change',e=>{ state.city=+e.target.value; rebuild(); });
+document.getElementById('reset').addEventListener('click',()=>{ defaultFrame(); });
+// выезжающая панель настроек (телефон)
+function setPanel(open){ document.body.classList.toggle('panel-open', open); defaultFrame(); }
+document.getElementById('settingsBtn').addEventListener('click',()=>setPanel(true));
+document.getElementById('barHandle').addEventListener('click',()=>setPanel(false));
+// тап по 3D-сцене (без вращения) — скрыть настройки
+let tapStart=null;
+canvas.addEventListener('pointerdown', e=>{ tapStart={x:e.clientX,y:e.clientY,t:performance.now()}; });
+canvas.addEventListener('pointerup', e=>{
+  if(!tapStart) return;
+  const moved=Math.hypot(e.clientX-tapStart.x, e.clientY-tapStart.y);
+  const dt=performance.now()-tapStart.t;
+  if(moved<8 && dt<300 && document.body.classList.contains('panel-open')) setPanel(false);
+  tapStart=null;
+});
+
+// ---------- запуск ----------
+function resize(){ const w=innerWidth,h=innerHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+addEventListener('resize',resize); resize();
+function animate(){ controls.update(); renderer.render(scene,camera); requestAnimationFrame(animate); }
+
+async function start(){
+  try { await Promise.race([ Promise.all(Object.values(FONTS).map(f=>document.fonts.load(`40px "${f}"`))), new Promise(r=>setTimeout(r,2500)) ]); } catch(e){}
+  try { buildModel(); updateSub(); if(headless) document.title='OK built'; }
+  catch(e){ document.title='ERR '+(e&&e.message||e); throw e; }
+  document.getElementById('loading').style.display='none';
+  const v=params.get('view');
+  if(v==='front') applyView(0.0,0.16,780);
+  else if(v==='top') applyView(0.5,0.85,900);
+  else defaultFrame();
+  if(params.get('panel')==='open') setPanel(true);
+  if(headless){
+    document.querySelector('.top').style.display='none'; document.querySelector('.bar').style.display='none'; document.getElementById('reset').style.display='none';
+    let n=0;(function loop(){ try{ n++; controls.update(); renderer.render(scene,camera);}catch(e){ document.title='RENDERERR '+e.message; window.__ready=true; return; }
+      if(n<4) requestAnimationFrame(loop);
+      else { try{ const url=renderer.domElement.toDataURL('image/png'); const el=document.createElement('div'); el.id='__png'; el.style.display='none'; el.textContent='PNGSTART'+url+'PNGEND'; document.body.appendChild(el); document.title='SHOT ok '+url.length; }catch(e){ document.title='SHOTERR '+e.message; } window.__ready=true; } })();
+  } else { animate(); }
+}
+start();
+</script>
 </body>
 </html>
